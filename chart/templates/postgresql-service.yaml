@@ -1,0 +1,37 @@
+{{/*
+Copyright (c) 2025 VH & Co BV. Licensed under the Business Source License 1.1.
+*/}}
+{{- if .Values.postgresql.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "stackweaver.fullname" . }}-postgresql
+  labels:
+    {{- include "stackweaver.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgresql
+spec:
+  type: ClusterIP
+  ports:
+    - port: 5432
+      targetPort: tcp-postgresql
+      protocol: TCP
+      name: tcp-postgresql
+  selector:
+    {{- include "stackweaver.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: postgresql
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "stackweaver.fullname" . }}-postgresql-init
+  labels:
+    {{- include "stackweaver.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgresql
+data:
+  init-postgres.sql: |
+    -- Enable UUID extension for uuid_generate_v4() function
+    CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+    -- Create Zitadel database (shared PostgreSQL instance)
+    SELECT 'CREATE DATABASE zitadel OWNER {{ .Values.postgresql.auth.username }}'
+    WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'zitadel')\gexec
+{{- end }}

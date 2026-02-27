@@ -1,0 +1,74 @@
+{{/*
+Copyright (c) 2025 VH & Co BV. Licensed under the Business Source License 1.1.
+*/}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "stackweaver.fullname" . }}-ansible-runner
+  labels:
+    {{- include "stackweaver.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ansible-runner
+spec:
+  replicas: {{ .Values.ansibleRunner.replicas }}
+  selector:
+    matchLabels:
+      {{- include "stackweaver.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: ansible-runner
+  template:
+    metadata:
+      labels:
+        {{- include "stackweaver.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: ansible-runner
+      {{- with .Values.ansibleRunner.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- include "stackweaver.imagePullSecrets" . | nindent 6 }}
+      serviceAccountName: {{ include "stackweaver.serviceAccountName" . }}
+      containers:
+        - name: ansible-runner
+          image: "{{ .Values.ansibleRunner.image.repository }}:{{ .Values.ansibleRunner.image.tag }}"
+          imagePullPolicy: {{ .Values.ansibleRunner.image.pullPolicy }}
+          env:
+            - name: LOG_LEVEL
+              value: info
+            # ── Database ──
+            {{- include "stackweaver.env.database" . | nindent 12 }}
+            # ── Redis ──
+            {{- include "stackweaver.env.redis" . | nindent 12 }}
+            # ── Storage ──
+            {{- include "stackweaver.env.storage" . | nindent 12 }}
+            - name: STORAGE_BUCKET
+              value: {{ .Values.storage.ansibleBucket | quote }}
+            # ── Encryption ──
+            {{- include "stackweaver.env.encryption" . | nindent 12 }}
+            # ── Workspaces ──
+            - name: WORKSPACES_DIR
+              value: /home/iac/workspaces
+            # ── Extra env vars (user overrides) ──
+            {{- range $key, $value := .Values.ansibleRunner.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+          volumeMounts:
+            - name: workspaces
+              mountPath: /home/iac/workspaces
+          resources:
+            {{- toYaml .Values.ansibleRunner.resources | nindent 12 }}
+      volumes:
+        - name: workspaces
+          persistentVolumeClaim:
+            claimName: {{ include "stackweaver.fullname" . }}-runner-workspaces
+      {{- with .Values.ansibleRunner.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.ansibleRunner.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.ansibleRunner.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

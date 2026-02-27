@@ -1,0 +1,189 @@
+{{/*
+Copyright (c) 2025 VH & Co BV. Licensed under the Business Source License 1.1.
+*/}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "stackweaver.fullname" . }}-api
+  labels:
+    {{- include "stackweaver.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+spec:
+  replicas: {{ .Values.api.replicas }}
+  selector:
+    matchLabels:
+      {{- include "stackweaver.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: api
+  template:
+    metadata:
+      labels:
+        {{- include "stackweaver.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: api
+      {{- with .Values.api.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- include "stackweaver.imagePullSecrets" . | nindent 6 }}
+      serviceAccountName: {{ include "stackweaver.serviceAccountName" . }}
+      containers:
+        - name: api
+          image: "{{ .Values.api.image.repository }}:{{ .Values.api.image.tag }}"
+          imagePullPolicy: {{ .Values.api.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.api.port }}
+              protocol: TCP
+          env:
+            - name: LOG_LEVEL
+              value: info
+            # ── Database ──
+            {{- include "stackweaver.env.database" . | nindent 12 }}
+            # ── Redis ──
+            {{- include "stackweaver.env.redis" . | nindent 12 }}
+            # ── Zitadel ──
+            - name: ZITADEL_ISSUER
+              value: {{ include "stackweaver.zitadel.issuer" . | quote }}
+            - name: ZITADEL_INTERNAL_ADDR
+              value: {{ include "stackweaver.zitadel.internalAddr" . | quote }}
+            - name: ZITADEL_API_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "stackweaver.secrets.zitadel" . }}
+                  key: {{ .Values.secrets.zitadel.keys.clientId }}
+                  optional: true
+            - name: ZITADEL_API_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "stackweaver.secrets.zitadel" . }}
+                  key: {{ .Values.secrets.zitadel.keys.clientSecret }}
+                  optional: true
+            - name: ZITADEL_LOGIN_SERVICE_USER_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "stackweaver.secrets.zitadel" . }}
+                  key: {{ .Values.secrets.zitadel.keys.loginServiceUserToken }}
+                  optional: true
+            - name: ZITADEL_WEBHOOK_IDP_SYNC_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "stackweaver.secrets.zitadel" . }}
+                  key: {{ .Values.secrets.zitadel.keys.webhookIdpSyncKey }}
+                  optional: true
+            - name: ZITADEL_WEBHOOK_COMPLEMENT_TOKEN_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "stackweaver.secrets.zitadel" . }}
+                  key: {{ .Values.secrets.zitadel.keys.webhookComplementTokenKey }}
+                  optional: true
+            # ── Encryption ──
+            {{- include "stackweaver.env.encryption" . | nindent 12 }}
+            # ── Storage (for registry) ──
+            - name: STORAGE_BACKEND
+              value: {{ .Values.storage.provider | quote }}
+            - name: STORAGE_BUCKET
+              value: {{ .Values.storage.registryBucket | quote }}
+            - name: MINIO_ENDPOINT
+              value: {{ include "stackweaver.minio.endpoint" . | quote }}
+            - name: MINIO_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "stackweaver.secrets.minio" . }}
+                  key: {{ .Values.secrets.minio.keys.accessKey }}
+            - name: MINIO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "stackweaver.secrets.minio" . }}
+                  key: {{ .Values.secrets.minio.keys.secretKey }}
+            - name: MINIO_USE_SSL
+              value: {{ include "stackweaver.minio.useSSL" . | quote }}
+            # ── GitHub App ──
+            {{- if .Values.secrets.githubApp.secretName }}
+            - name: GITHUB_APP_ID
+              value: {{ .Values.api.githubApp.id | quote }}
+            - name: GITHUB_APP_NAME
+              value: {{ .Values.api.githubApp.name | quote }}
+            - name: GITHUB_APP_PRIVATE_KEY_PATH
+              value: /etc/github-app/private-key.pem
+            - name: GITHUB_WEBHOOK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.githubApp.secretName }}
+                  key: {{ .Values.secrets.githubApp.keys.webhookSecret }}
+                  optional: true
+            {{- end }}
+            # ── OIDC Workload Identity ──
+            {{- if .Values.oidc.issuerUrl }}
+            - name: OIDC_ISSUER_URL
+              value: {{ .Values.oidc.issuerUrl | quote }}
+            {{- end }}
+            {{- if .Values.secrets.oidc.secretName }}
+            - name: OIDC_SIGNING_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.oidc.secretName }}
+                  key: {{ .Values.secrets.oidc.keys.signingKey }}
+                  optional: true
+            {{- end }}
+            # ── CORS ──
+            {{- if .Values.api.corsExtraOrigins }}
+            - name: CORS_EXTRA_ORIGINS
+              value: {{ .Values.api.corsExtraOrigins | quote }}
+            {{- end }}
+            # ── SSO ──
+            {{- if .Values.sso.enableOidcTeamSync }}
+            - name: ENABLE_OIDC_TEAM_SYNC
+              value: "true"
+            {{- end }}
+            {{- if .Values.sso.oidcRemoveFromNonSsoTeams }}
+            - name: OIDC_REMOVE_FROM_NON_SSO_TEAMS
+              value: "true"
+            {{- end }}
+            # ── Extra env vars (user overrides) ──
+            {{- range $key, $value := .Values.api.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+          {{- if .Values.secrets.githubApp.secretName }}
+          volumeMounts:
+            - name: github-app-key
+              mountPath: /etc/github-app
+              readOnly: true
+          {{- end }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+          resources:
+            {{- toYaml .Values.api.resources | nindent 12 }}
+      {{- if .Values.secrets.githubApp.secretName }}
+      volumes:
+        - name: github-app-key
+          secret:
+            secretName: {{ .Values.secrets.githubApp.secretName }}
+            items:
+              - key: {{ .Values.secrets.githubApp.keys.privateKey }}
+                path: private-key.pem
+      {{- end }}
+      {{- with .Values.api.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.api.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.api.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
