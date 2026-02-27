@@ -1,0 +1,82 @@
+{{/*
+Copyright (c) 2025 VH & Co BV. Licensed under the Business Source License 1.1.
+*/}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "stackweaver.fullname" . }}-orchestrator
+  labels:
+    {{- include "stackweaver.labels" . | nindent 4 }}
+    app.kubernetes.io/component: orchestrator
+spec:
+  replicas: {{ .Values.orchestrator.replicas }}
+  selector:
+    matchLabels:
+      {{- include "stackweaver.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: orchestrator
+  template:
+    metadata:
+      labels:
+        {{- include "stackweaver.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: orchestrator
+      {{- with .Values.orchestrator.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- include "stackweaver.imagePullSecrets" . | nindent 6 }}
+      serviceAccountName: {{ include "stackweaver.serviceAccountName" . }}
+      containers:
+        - name: orchestrator
+          image: "{{ .Values.orchestrator.image.repository }}:{{ .Values.orchestrator.image.tag }}"
+          imagePullPolicy: {{ .Values.orchestrator.image.pullPolicy }}
+          env:
+            - name: LOG_LEVEL
+              value: info
+            # ── Database ──
+            {{- include "stackweaver.env.database" . | nindent 12 }}
+            # ── Redis ──
+            {{- include "stackweaver.env.redis" . | nindent 12 }}
+            # ── GitHub App (for PR status checks) ──
+            {{- if .Values.secrets.githubApp.secretName }}
+            - name: GITHUB_APP_ID
+              value: {{ .Values.orchestrator.githubApp.id | quote }}
+            - name: GITHUB_APP_NAME
+              value: {{ .Values.orchestrator.githubApp.name | quote }}
+            - name: GITHUB_APP_PRIVATE_KEY_PATH
+              value: /etc/github-app/private-key.pem
+            {{- end }}
+            # ── Extra env vars (user overrides) ──
+            {{- range $key, $value := .Values.orchestrator.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+          {{- if .Values.secrets.githubApp.secretName }}
+          volumeMounts:
+            - name: github-app-key
+              mountPath: /etc/github-app
+              readOnly: true
+          {{- end }}
+          resources:
+            {{- toYaml .Values.orchestrator.resources | nindent 12 }}
+      {{- if .Values.secrets.githubApp.secretName }}
+      volumes:
+        - name: github-app-key
+          secret:
+            secretName: {{ .Values.secrets.githubApp.secretName }}
+            items:
+              - key: {{ .Values.secrets.githubApp.keys.privateKey }}
+                path: private-key.pem
+      {{- end }}
+      {{- with .Values.orchestrator.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.orchestrator.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.orchestrator.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

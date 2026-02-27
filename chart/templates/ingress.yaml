@@ -1,0 +1,139 @@
+{{/*
+Copyright (c) 2025 VH & Co BV. Licensed under the Business Source License 1.1.
+
+Two-domain ingress:
+  1. App domain  — Frontend SPA + API backend (path-based routing)
+  2. Auth domain — Zitadel OIDC + Login UI (path-based routing)
+
+API paths (/api/v2, /.well-known/terraform.json, /v1/modules, /health)
+are routed to the API service. Everything else on the app domain goes
+to the frontend nginx SPA.
+
+On the auth domain, /ui/v2/login goes to the Login UI service;
+everything else (OIDC endpoints, gRPC, etc.) goes to Zitadel.
+*/}}
+{{- if .Values.ingress.enabled }}
+# ── App Ingress (Frontend + API) ──────────────────────────────────────────────
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "stackweaver.fullname" . }}-app
+  labels:
+    {{- include "stackweaver.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ingress
+  annotations:
+    {{- with .Values.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+    # Enable regex matching for nginx (needed for path-based routing)
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    # Increase body size for file uploads (Terraform state, modules, etc.)
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+    # WebSocket support for log streaming
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+spec:
+  {{- if .Values.ingress.className }}
+  ingressClassName: {{ .Values.ingress.className }}
+  {{- end }}
+  {{- if .Values.ingress.tls.enabled }}
+  tls:
+    - hosts:
+        - {{ .Values.ingress.hosts.app | quote }}
+      secretName: {{ .Values.ingress.tls.secretName }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.ingress.hosts.app | quote }}
+      http:
+        paths:
+          # ── API routes (must come before frontend catch-all) ──
+          # Main API
+          - path: /api/v2
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "stackweaver.fullname" . }}-api
+                port:
+                  number: {{ .Values.api.port }}
+          # Terraform service discovery
+          - path: /.well-known/terraform.json
+            pathType: Exact
+            backend:
+              service:
+                name: {{ include "stackweaver.fullname" . }}-api
+                port:
+                  number: {{ .Values.api.port }}
+          # Terraform module registry
+          - path: /v1/modules
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "stackweaver.fullname" . }}-api
+                port:
+                  number: {{ .Values.api.port }}
+          # Health check
+          - path: /health
+            pathType: Exact
+            backend:
+              service:
+                name: {{ include "stackweaver.fullname" . }}-api
+                port:
+                  number: {{ .Values.api.port }}
+          # ── Frontend catch-all ──
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "stackweaver.fullname" . }}-frontend
+                port:
+                  number: {{ .Values.frontend.port }}
+---
+# ── Auth Ingress (Zitadel + Login UI) ────────────────────────────────────────
+{{- if .Values.zitadel.bundled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "stackweaver.fullname" . }}-auth
+  labels:
+    {{- include "stackweaver.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ingress-auth
+  annotations:
+    {{- with .Values.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    # Zitadel uses gRPC — enable HTTP/2 backend protocol
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+spec:
+  {{- if .Values.ingress.className }}
+  ingressClassName: {{ .Values.ingress.className }}
+  {{- end }}
+  {{- if .Values.ingress.tls.enabled }}
+  tls:
+    - hosts:
+        - {{ .Values.ingress.hosts.auth | quote }}
+      secretName: {{ .Values.ingress.tls.authSecretName }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.ingress.hosts.auth | quote }}
+      http:
+        paths:
+          # Login UI (Next.js app at /ui/v2/login)
+          - path: /ui/v2/login
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "stackweaver.fullname" . }}-login-ui
+                port:
+                  number: 3000
+          # Zitadel catch-all (OIDC, API, admin, etc.)
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "stackweaver.fullname" . }}-zitadel
+                port:
+                  number: 8080
+{{- end }}
+{{- end }}

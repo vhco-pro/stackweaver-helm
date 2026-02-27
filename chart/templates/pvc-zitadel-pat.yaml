@@ -1,0 +1,20 @@
+{{/*
+Copyright (c) 2025 VH & Co BV. Licensed under the Business Source License 1.1.
+
+PVC for sharing Zitadel PAT between Zitadel and zitadel-init Job.
+*/}}
+{{- if .Values.zitadel.bundled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "stackweaver.fullname" . }}-zitadel-pat
+  labels:
+    {{- include "stackweaver.labels" . | nindent 4 }}
+    app.kubernetes.io/component: zitadel
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 1Mi
+{{- end }}

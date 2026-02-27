@@ -1,0 +1,28 @@
+# Copyright (c) 2025 VH & Co BV. Licensed under the Business Source License 1.1. See LICENSE for details.
+
+apiVersion: v2
+name: stackweaver
+description: >-
+  StackWeaver — Open-source DevOps platform for multi-IaC orchestration
+  (Terraform, Ansible, OpenTofu). Includes optional bundled dependencies
+  (PostgreSQL, Redis, MinIO, Zitadel) or bring-your-own.
+
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+
+home: https://github.com/stackweaver/stackweaver
+sources:
+  - https://github.com/stackweaver/stackweaver
+
+keywords:
+  - devops
+  - terraform
+  - ansible
+  - opentofu
+  - iac
+  - infrastructure-as-code
+
+maintainers:
+  - name: StackWeaver
+    url: https://github.com/stackweaver
