@@ -1,0 +1,58 @@
+{{/*
+Copyright (c) 2025 VH & Co BV. Licensed under the Business Source License 1.1.
+
+MinIO bucket initialization job.
+Creates required buckets: iac-state, terraform-registry, ansible-artifacts.
+*/}}
+{{- if .Values.minio.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "stackweaver.fullname" . }}-minio-init
+  labels:
+    {{- include "stackweaver.labels" . | nindent 4 }}
+    app.kubernetes.io/component: minio-init
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "5"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 10
+  template:
+    metadata:
+      labels:
+        {{- include "stackweaver.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: minio-init
+    spec:
+      {{- include "stackweaver.imagePullSecrets" . | nindent 6 }}
+      restartPolicy: OnFailure
+      containers:
+        - name: mc
+          image: minio/mc:latest
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              echo "Waiting for MinIO..."
+              until mc alias set myminio http://{{ include "stackweaver.fullname" . }}-minio:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" 2>/dev/null; do
+                echo "MinIO not ready, retrying in 5s..."
+                sleep 5
+              done
+              echo "MinIO is ready"
+              mc mb --ignore-existing myminio/{{ .Values.storage.stateBucket }}
+              mc mb --ignore-existing myminio/{{ .Values.storage.registryBucket }}
+              mc mb --ignore-existing myminio/{{ .Values.storage.ansibleBucket }}
+              echo "Buckets created successfully"
+          env:
+            - name: MINIO_ROOT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "stackweaver.secrets.minio" . }}
+                  key: {{ .Values.secrets.minio.keys.accessKey }}
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "stackweaver.secrets.minio" . }}
+                  key: {{ .Values.secrets.minio.keys.secretKey }}
+{{- end }}

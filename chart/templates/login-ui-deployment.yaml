@@ -1,0 +1,64 @@
+{{/*
+Copyright (c) 2025 VH & Co BV. Licensed under the Business Source License 1.1.
+*/}}
+{{- if .Values.zitadel.bundled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "stackweaver.fullname" . }}-login-ui
+  labels:
+    {{- include "stackweaver.labels" . | nindent 4 }}
+    app.kubernetes.io/component: login-ui
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "stackweaver.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: login-ui
+  template:
+    metadata:
+      labels:
+        {{- include "stackweaver.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: login-ui
+    spec:
+      {{- include "stackweaver.imagePullSecrets" . | nindent 6 }}
+      containers:
+        - name: login-ui
+          image: "{{ .Values.zitadel.loginUI.image.repository }}:{{ .Values.zitadel.loginUI.image.tag }}"
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+          env:
+            - name: NEXT_PUBLIC_BASE_PATH
+              value: /ui/v2/login
+            - name: ZITADEL_API_URL
+              value: "http://{{ include "stackweaver.fullname" . }}-zitadel:8080"
+            - name: ZITADEL_SERVICE_USER_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "stackweaver.secrets.zitadel" . }}
+                  key: {{ .Values.secrets.zitadel.keys.loginServiceUserToken }}
+                  optional: true
+            - name: EMAIL_VERIFICATION
+              value: "false"
+            # Send instance host header for correct IdP callback URLs
+            - name: CUSTOM_REQUEST_HEADERS
+              value: "x-zitadel-instance-host:{{ .Values.ingress.hosts.auth }}"
+          livenessProbe:
+            httpGet:
+              path: /ui/v2/login
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 30
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /ui/v2/login
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+          resources:
+            {{- toYaml .Values.zitadel.loginUI.resources | nindent 12 }}
+{{- end }}

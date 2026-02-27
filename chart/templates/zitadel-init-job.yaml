@@ -1,0 +1,71 @@
+{{/*
+Copyright (c) 2025 VH & Co BV. Licensed under the Business Source License 1.1.
+
+Zitadel initialization Job.
+Runs the zitadel-init Go app which sets up the org, project, OIDC apps,
+service users, and other Zitadel configuration via gRPC API.
+
+Reads the PAT written by Zitadel's start-from-init and configures everything
+StackWeaver needs. Outputs credentials that should be stored in the Zitadel
+secret (clientId, clientSecret, loginServiceUserToken, frontendClientId, etc.).
+*/}}
+{{- if .Values.zitadel.bundled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "stackweaver.fullname" . }}-zitadel-init
+  labels:
+    {{- include "stackweaver.labels" . | nindent 4 }}
+    app.kubernetes.io/component: zitadel-init
+  annotations:
+    helm.sh/hook: post-install
+    helm.sh/hook-weight: "10"
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  backoffLimit: 20
+  activeDeadlineSeconds: 600
+  template:
+    metadata:
+      labels:
+        {{- include "stackweaver.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: zitadel-init
+    spec:
+      {{- include "stackweaver.imagePullSecrets" . | nindent 6 }}
+      restartPolicy: OnFailure
+      containers:
+        - name: zitadel-init
+          image: "{{ .Values.zitadel.init.image.repository }}:{{ .Values.zitadel.init.image.tag }}"
+          env:
+            - name: ZITADEL_ISSUER
+              value: "{{ include "stackweaver.zitadel.issuer" . }}/ui/v2/login"
+            - name: ZITADEL_INTERNAL_ADDR
+              value: {{ include "stackweaver.zitadel.internalAddr" . | quote }}
+            - name: PROJECT_ROOT
+              value: /config
+            - name: ZITADEL_ADMIN_USERNAME
+              value: {{ .Values.zitadel.init.adminUsername | quote }}
+            - name: ZITADEL_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "stackweaver.secrets.zitadel" . }}
+                  key: {{ .Values.secrets.zitadel.keys.adminPassword }}
+            - name: ZITADEL_PAT_PATH
+              value: /pat/admin.pat
+            # Frontend redirect URIs
+            - name: FRONTEND_REDIRECT_URI
+              value: {{ include "stackweaver.frontend.redirectURI" . | quote }}
+            - name: FRONTEND_POST_LOGOUT_URI
+              value: {{ include "stackweaver.app.url" . | quote }}
+          volumeMounts:
+            - name: pat
+              mountPath: /pat
+              readOnly: true
+          {{- with .Values.zitadel.init.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      volumes:
+        - name: pat
+          persistentVolumeClaim:
+            claimName: {{ include "stackweaver.fullname" . }}-zitadel-pat
+{{- end }}

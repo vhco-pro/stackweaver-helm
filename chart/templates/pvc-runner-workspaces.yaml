@@ -1,0 +1,21 @@
+{{/*
+Copyright (c) 2025 VH & Co BV. Licensed under the Business Source License 1.1.
+
+Shared PVC for Terraform runner and Ansible runner workspace directories.
+*/}}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "stackweaver.fullname" . }}-runner-workspaces
+  labels:
+    {{- include "stackweaver.labels" . | nindent 4 }}
+    app.kubernetes.io/component: runner
+spec:
+  accessModes:
+    - {{ .Values.runnerWorkspaces.accessMode | default "ReadWriteMany" }}
+  resources:
+    requests:
+      storage: {{ .Values.runnerWorkspaces.size | default "10Gi" }}
+  {{- if .Values.runnerWorkspaces.storageClass }}
+  storageClassName: {{ .Values.runnerWorkspaces.storageClass | quote }}
+  {{- end }}

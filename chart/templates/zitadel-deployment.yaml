@@ -1,0 +1,107 @@
+{{/*
+Copyright (c) 2025 VH & Co BV. Licensed under the Business Source License 1.1.
+*/}}
+{{- if .Values.zitadel.bundled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "stackweaver.fullname" . }}-zitadel
+  labels:
+    {{- include "stackweaver.labels" . | nindent 4 }}
+    app.kubernetes.io/component: zitadel
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "stackweaver.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: zitadel
+  template:
+    metadata:
+      labels:
+        {{- include "stackweaver.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: zitadel
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap-zitadel.yaml") . | sha256sum }}
+    spec:
+      {{- include "stackweaver.imagePullSecrets" . | nindent 6 }}
+      # Run as root (Zitadel needs to write PAT file)
+      securityContext:
+        runAsUser: 0
+      containers:
+        - name: zitadel
+          image: "{{ .Values.zitadel.image.repository }}:{{ .Values.zitadel.image.tag }}"
+          command:
+            - zitadel
+            - start-from-init
+            - --config
+            - /etc/zitadel/defaults.yaml
+            - --steps
+            - /etc/zitadel/init-steps.yaml
+            - --masterkey
+            - $(ZITADEL_MASTERKEY)
+            - --tlsMode
+            - external
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          env:
+            - name: ZITADEL_MASTERKEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "stackweaver.secrets.zitadel" . }}
+                  key: {{ .Values.secrets.zitadel.keys.masterkey }}
+            # Override DB password placeholders from configmap
+            - name: ZITADEL_DATABASE_POSTGRES_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "stackweaver.secrets.postgresql" . }}
+                  key: {{ .Values.secrets.postgresql.keys.password }}
+            - name: ZITADEL_DATABASE_POSTGRES_USER_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "stackweaver.secrets.postgresql" . }}
+                  key: {{ .Values.secrets.postgresql.keys.password }}
+            # Override the first instance admin password from init-steps
+            - name: ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "stackweaver.secrets.zitadel" . }}
+                  key: {{ .Values.secrets.zitadel.keys.adminPassword }}
+            - name: ZITADEL_DATABASE_POSTGRES_HOST
+              value: {{ include "stackweaver.postgresql.host" . | quote }}
+            - name: ZITADEL_LOGIN_UI_BASE_URL
+              value: {{ include "stackweaver.loginUI.baseURL" . | quote }}
+            - name: ZITADEL_LOGIN_UI_ORIGIN
+              value: {{ include "stackweaver.loginUI.origin" . | quote }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/zitadel
+              readOnly: true
+            - name: pat
+              mountPath: /pat
+          livenessProbe:
+            httpGet:
+              path: /debug/healthz
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 10
+          readinessProbe:
+            httpGet:
+              path: /debug/ready
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+          resources:
+            {{- toYaml .Values.zitadel.resources | nindent 12 }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "stackweaver.fullname" . }}-zitadel-config
+        - name: pat
+          persistentVolumeClaim:
+            claimName: {{ include "stackweaver.fullname" . }}-zitadel-pat
+{{- end }}

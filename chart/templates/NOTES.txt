@@ -1,0 +1,58 @@
+{{/*
+Copyright (c) 2025 VH & Co BV. Licensed under the Business Source License 1.1.
+*/}}
+
+────────────────────────────────────────────────────────────
+  StackWeaver has been installed.
+────────────────────────────────────────────────────────────
+
+{{- if .Values.ingress.enabled }}
+Application URL:  {{ include "stackweaver.app.url" . }}
+API URL:          {{ include "stackweaver.api.url" . }}
+{{- if .Values.zitadel.bundled }}
+Auth (Zitadel):   {{ include "stackweaver.zitadel.issuer" . }}
+Login UI:         {{ include "stackweaver.loginUI.baseURL" . }}
+{{- end }}
+{{- else }}
+Access the application by port-forwarding:
+  kubectl port-forward svc/{{ include "stackweaver.fullname" . }}-frontend 8080:{{ .Values.frontend.port }}
+  kubectl port-forward svc/{{ include "stackweaver.fullname" . }}-api 8022:{{ .Values.api.port }}
+{{- end }}
+
+── Secrets ──
+
+{{- if or (not .Values.secrets.postgresql.secretName) (not .Values.secrets.minio.secretName) (not .Values.secrets.encryption.secretName) (not .Values.secrets.zitadel.secretName) }}
+
+The chart has auto-generated secrets for components where you didn't
+provide an external secretName. They are preserved across upgrades.
+
+To view a generated password:
+  kubectl get secret {{ include "stackweaver.fullname" . }}-postgresql -o jsonpath='{.data.password}' | base64 -d
+{{- else }}
+
+All secrets are managed externally. The chart did not create any Secret resources.
+{{- end }}
+
+{{- if .Values.zitadel.bundled }}
+
+── Zitadel Initialization ──
+
+After Zitadel starts, the zitadel-init Job will automatically:
+  1. Create the StackWeaver organisation, project, and OIDC apps
+  2. Create service users and PATs
+  3. Configure webhooks and IdP sync
+
+The init job outputs credentials (clientId, clientSecret, etc.) that must
+be added to the Zitadel secret for the API and frontend to function:
+
+  kubectl logs job/{{ include "stackweaver.fullname" . }}-zitadel-init
+
+Then update the secret:
+  kubectl patch secret {{ include "stackweaver.secrets.zitadel" . }} --type merge \
+    -p '{"stringData": {"client-id": "<value>", ...}}'
+
+And restart the API:
+  kubectl rollout restart deployment/{{ include "stackweaver.fullname" . }}-api
+{{- end }}
+
+For documentation: https://github.com/stackweaver/stackweaver

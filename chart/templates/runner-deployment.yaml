@@ -1,0 +1,92 @@
+{{/*
+Copyright (c) 2025 VH & Co BV. Licensed under the Business Source License 1.1.
+*/}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "stackweaver.fullname" . }}-runner
+  labels:
+    {{- include "stackweaver.labels" . | nindent 4 }}
+    app.kubernetes.io/component: runner
+spec:
+  replicas: {{ .Values.runner.replicas }}
+  selector:
+    matchLabels:
+      {{- include "stackweaver.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: runner
+  template:
+    metadata:
+      labels:
+        {{- include "stackweaver.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: runner
+      {{- with .Values.runner.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- include "stackweaver.imagePullSecrets" . | nindent 6 }}
+      serviceAccountName: {{ include "stackweaver.serviceAccountName" . }}
+      containers:
+        - name: runner
+          image: "{{ .Values.runner.image.repository }}:{{ .Values.runner.image.tag }}"
+          imagePullPolicy: {{ .Values.runner.image.pullPolicy }}
+          env:
+            - name: LOG_LEVEL
+              value: info
+            # ── Database ──
+            {{- include "stackweaver.env.database" . | nindent 12 }}
+            # ── Redis ──
+            {{- include "stackweaver.env.redis" . | nindent 12 }}
+            # ── Storage ──
+            {{- include "stackweaver.env.storage" . | nindent 12 }}
+            - name: STORAGE_BUCKET
+              value: {{ .Values.storage.registryBucket | quote }}
+            - name: STATE_BUCKET
+              value: {{ .Values.storage.stateBucket | quote }}
+            # ── Encryption ──
+            {{- include "stackweaver.env.encryption" . | nindent 12 }}
+            # ── OIDC Workload Identity ──
+            {{- if .Values.oidc.issuerUrl }}
+            - name: OIDC_ISSUER_URL
+              value: {{ .Values.oidc.issuerUrl | quote }}
+            {{- else }}
+            - name: OIDC_ISSUER_URL
+              value: {{ include "stackweaver.api.url" . | quote }}
+            {{- end }}
+            {{- if .Values.secrets.oidc.secretName }}
+            - name: OIDC_SIGNING_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.oidc.secretName }}
+                  key: {{ .Values.secrets.oidc.keys.signingKey }}
+                  optional: true
+            {{- end }}
+            # ── Workspaces ──
+            - name: WORKSPACES_DIR
+              value: /home/iac/workspaces
+            # ── Extra env vars (user overrides) ──
+            {{- range $key, $value := .Values.runner.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+          volumeMounts:
+            - name: workspaces
+              mountPath: /home/iac/workspaces
+          resources:
+            {{- toYaml .Values.runner.resources | nindent 12 }}
+      volumes:
+        - name: workspaces
+          persistentVolumeClaim:
+            claimName: {{ include "stackweaver.fullname" . }}-runner-workspaces
+      {{- with .Values.runner.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.runner.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.runner.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

@@ -1,0 +1,26 @@
+{{/*
+Copyright (c) 2025 VH & Co BV. Licensed under the Business Source License 1.1.
+*/}}
+{{- if .Values.minio.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "stackweaver.fullname" . }}-minio
+  labels:
+    {{- include "stackweaver.labels" . | nindent 4 }}
+    app.kubernetes.io/component: minio
+spec:
+  type: ClusterIP
+  ports:
+    - port: 9000
+      targetPort: http-api
+      protocol: TCP
+      name: http-api
+    - port: {{ .Values.minio.consolePort }}
+      targetPort: http-console
+      protocol: TCP
+      name: http-console
+  selector:
+    {{- include "stackweaver.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: minio
+{{- end }}

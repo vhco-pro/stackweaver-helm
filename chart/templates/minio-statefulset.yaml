@@ -1,0 +1,84 @@
+{{/*
+Copyright (c) 2025 VH & Co BV. Licensed under the Business Source License 1.1.
+*/}}
+{{- if .Values.minio.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "stackweaver.fullname" . }}-minio
+  labels:
+    {{- include "stackweaver.labels" . | nindent 4 }}
+    app.kubernetes.io/component: minio
+spec:
+  serviceName: {{ include "stackweaver.fullname" . }}-minio
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "stackweaver.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: minio
+  template:
+    metadata:
+      labels:
+        {{- include "stackweaver.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: minio
+    spec:
+      {{- include "stackweaver.imagePullSecrets" . | nindent 6 }}
+      containers:
+        - name: minio
+          image: "{{ .Values.minio.image.repository }}:{{ .Values.minio.image.tag }}"
+          command:
+            - minio
+            - server
+            - /data
+            - --console-address
+            - ":{{ .Values.minio.consolePort }}"
+          ports:
+            - name: http-api
+              containerPort: 9000
+              protocol: TCP
+            - name: http-console
+              containerPort: {{ .Values.minio.consolePort }}
+              protocol: TCP
+          env:
+            - name: MINIO_ROOT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "stackweaver.secrets.minio" . }}
+                  key: {{ .Values.secrets.minio.keys.accessKey }}
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "stackweaver.secrets.minio" . }}
+                  key: {{ .Values.secrets.minio.keys.secretKey }}
+          livenessProbe:
+            httpGet:
+              path: /minio/health/live
+              port: http-api
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /minio/health/ready
+              port: http-api
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            timeoutSeconds: 10
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          resources:
+            {{- toYaml .Values.minio.resources | nindent 12 }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: {{ .Values.minio.storage.size }}
+        {{- if .Values.minio.storage.storageClass }}
+        storageClassName: {{ .Values.minio.storage.storageClass }}
+        {{- end }}
+{{- end }}
