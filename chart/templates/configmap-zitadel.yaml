@@ -1,0 +1,81 @@
+{{/*
+Copyright (c) 2025 VH & Co BV. Licensed under the Business Source License 1.1.
+
+Zitadel configuration — defaults.yaml and init-steps.yaml as ConfigMap.
+Database password is injected via Zitadel's ZITADEL_DATABASE_POSTGRES_* env vars,
+NOT in this file. The placeholder "INJECTED_VIA_ENV" is overridden at runtime.
+*/}}
+{{- if .Values.zitadel.bundled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "stackweaver.fullname" . }}-zitadel-config
+  labels:
+    {{- include "stackweaver.labels" . | nindent 4 }}
+    app.kubernetes.io/component: zitadel
+data:
+  defaults.yaml: |
+    ExternalDomain: {{ .Values.ingress.hosts.auth }}
+    ExternalPort: {{ ternary 443 80 .Values.ingress.tls.enabled }}
+    ExternalSecure: {{ .Values.ingress.tls.enabled }}
+    TLS:
+      Enabled: false
+
+    Database:
+      Postgres:
+        Host: {{ include "stackweaver.postgresql.host" . }}
+        Port: {{ include "stackweaver.postgresql.port" . }}
+        Database: zitadel
+        Admin:
+          Username: {{ include "stackweaver.postgresql.username" . }}
+          Password: INJECTED_VIA_ENV
+          SSL:
+            Mode: {{ include "stackweaver.postgresql.sslmode" . }}
+        User:
+          Username: {{ include "stackweaver.postgresql.username" . }}
+          Password: INJECTED_VIA_ENV
+          SSL:
+            Mode: {{ include "stackweaver.postgresql.sslmode" . }}
+
+    DefaultInstance:
+      LoginPolicy:
+        AllowUsernamePassword: true
+        AllowExternalIDPs: true
+      Org:
+        LoginPolicy:
+          AllowUsernamePassword: true
+      Features:
+        LoginDefaultOrg: true
+        LoginV2:
+          Required: true
+          BaseURI: http://{{ include "stackweaver.fullname" . }}-login-ui:3000/ui/v2/login
+      OIDCSettings:
+        AccessTokenLifetime: {{ .Values.zitadel.config.accessTokenLifetime | default "12h" }}
+        IdTokenLifetime: {{ .Values.zitadel.config.idTokenLifetime | default "12h" }}
+        RefreshTokenIdleExpiration: {{ .Values.zitadel.config.refreshTokenIdleExpiration | default "720h" }}
+        RefreshTokenExpiration: {{ .Values.zitadel.config.refreshTokenExpiration | default "2160h" }}
+
+  init-steps.yaml: |
+    FirstInstance:
+      Skip: false
+      PatPath: /pat/admin.pat
+      InstanceName: "StackWeaver Instance"
+      DefaultLanguage: en
+      Org:
+        Name: ZITADEL
+        Human:
+          UserName: admin
+          FirstName: Admin
+          LastName: User
+          Email:
+            Address: {{ .Values.zitadel.init.adminUsername }}
+            Verified: true
+          Password: INJECTED_VIA_ENV
+          PasswordChangeRequired: false
+        Machine:
+          Machine:
+            Username: admin
+            Name: "Automatically Initialized IAM_OWNER"
+          Pat:
+            ExpirationDate: "2030-01-01T00:00:00Z"
+{{- end }}
