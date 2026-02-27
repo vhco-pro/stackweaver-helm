@@ -1,0 +1,35 @@
+# Copyright (c) 2025 VH & Co BV. Licensed under the Business Source License 1.1. See LICENSE for details.
+
+name: Release Helm Chart
+
+on:
+  push:
+    tags:
+      - '*.*.*'
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+
+      - name: Login to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Package chart
+        run: |
+          # Set chart version from git tag
+          sed -i "s/^version:.*/version: ${{ github.ref_name }}/" chart/Chart.yaml
+          sed -i "s/^appVersion:.*/appVersion: \"${{ github.ref_name }}\"/" chart/Chart.yaml
+          helm package chart/
+
+      - name: Push to GHCR
+        run: helm push stackweaver-${{ github.ref_name }}.tgz oci://ghcr.io/vhco-pro/charts
