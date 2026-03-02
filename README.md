@@ -2,7 +2,8 @@
 
 Helm chart for deploying [Stackweaver](https://github.com/vhco-pro/stackweaver) on Kubernetes.
 
-> **This repository is auto-synced from the Stackweaver monorepo. Do not make changes here directly.**
+> [!IMPORTANT]
+> **This repository is auto-synced from the Stackweaver monorepo. Changes to the `chart` direcotry will be overwritten.**
 
 ## Installation
 
@@ -22,4 +23,4 @@ See [values.yaml](chart/values.yaml) for all available configuration options.
 
 ## License
 
-Business Source License 1.1 — see [LICENSE](LICENSE) for details.
+Licensed under Apache 2.0  — see [LICENSE](LICENSE) for details.

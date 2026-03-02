@@ -33,3 +33,12 @@ jobs:
 
       - name: Push to GHCR
         run: helm push stackweaver-${{ github.ref_name }}.tgz oci://ghcr.io/vhco-pro/charts
+
+      - name: Update README version
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          sed -i "s|--version [0-9]\+\.[0-9]\+\.[0-9]\+|--version ${{ github.ref_name }}|g" README.md
+          git add README.md
+          git commit -m "chore: update README to ${{ github.ref_name }} [skip ci]" || true
+          git push || true
