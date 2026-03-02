@@ -3,7 +3,7 @@
 Helm chart for deploying [Stackweaver](https://github.com/vhco-pro/stackweaver) on Kubernetes.
 
 > [!IMPORTANT]
-> **This repository is auto-synced from the Stackweaver monorepo. Changes to the `chart` direcotry will be overwritten.**
+> **This repository is auto-synced from the Stackweaver monorepo. Changes to the `chart` directory will be overwritten.**
 
 ## Installation
 
