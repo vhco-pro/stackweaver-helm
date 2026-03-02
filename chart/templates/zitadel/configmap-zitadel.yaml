@@ -1,10 +1,3 @@
-{{/*
-Copyright (c) 2025 VH & Co BV. Licensed under the Business Source License 1.1.
-
-Zitadel configuration — defaults.yaml and init-steps.yaml as ConfigMap.
-Database password is injected via Zitadel's ZITADEL_DATABASE_POSTGRES_* env vars,
-NOT in this file. The placeholder "INJECTED_VIA_ENV" is overridden at runtime.
-*/}}
 {{- if .Values.zitadel.bundled }}
 apiVersion: v1
 kind: ConfigMap

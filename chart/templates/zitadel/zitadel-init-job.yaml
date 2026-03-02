@@ -1,14 +1,3 @@
-{{/*
-Copyright (c) 2025 VH & Co BV. Licensed under the Business Source License 1.1.
-
-Zitadel initialization Job.
-Runs the zitadel-init Go app which sets up the org, project, OIDC apps,
-service users, and other Zitadel configuration via gRPC API.
-
-Reads the PAT written by Zitadel's start-from-init and configures everything
-StackWeaver needs. Outputs credentials that should be stored in the Zitadel
-secret (clientId, clientSecret, loginServiceUserToken, frontendClientId, etc.).
-*/}}
 {{- if .Values.zitadel.bundled }}
 apiVersion: batch/v1
 kind: Job
@@ -18,7 +7,7 @@ metadata:
     {{- include "stackweaver.labels" . | nindent 4 }}
     app.kubernetes.io/component: zitadel-init
   annotations:
-    helm.sh/hook: post-install
+    helm.sh/hook: post-install,post-upgrade
     helm.sh/hook-weight: "10"
     helm.sh/hook-delete-policy: before-hook-creation
 spec:
@@ -31,6 +20,7 @@ spec:
         app.kubernetes.io/component: zitadel-init
     spec:
       {{- include "stackweaver.imagePullSecrets" . | nindent 6 }}
+      serviceAccountName: {{ include "stackweaver.fullname" . }}-zitadel-init
       restartPolicy: OnFailure
       containers:
         - name: zitadel-init
@@ -56,6 +46,32 @@ spec:
               value: {{ include "stackweaver.frontend.redirectURI" . | quote }}
             - name: FRONTEND_POST_LOGOUT_URI
               value: {{ include "stackweaver.app.url" . | quote }}
+            # ── Kubernetes secret writer ──
+            - name: K8S_SECRET_NAME
+              value: {{ include "stackweaver.secrets.zitadel" . }}
+            - name: K8S_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: K8S_API_DEPLOYMENT
+              value: {{ include "stackweaver.fullname" . }}-api
+            - name: K8S_FRONTEND_DEPLOYMENT
+              value: {{ include "stackweaver.fullname" . }}-frontend
+            - name: K8S_LOGIN_UI_DEPLOYMENT
+              value: {{ include "stackweaver.fullname" . }}-login-ui
+            # Secret key name overrides (defaults match chart values)
+            - name: K8S_KEY_CLIENT_ID
+              value: {{ .Values.secrets.zitadel.keys.clientId }}
+            - name: K8S_KEY_CLIENT_SECRET
+              value: {{ .Values.secrets.zitadel.keys.clientSecret }}
+            - name: K8S_KEY_LOGIN_SERVICE_USER_TOKEN
+              value: {{ .Values.secrets.zitadel.keys.loginServiceUserToken }}
+            - name: K8S_KEY_FRONTEND_CLIENT_ID
+              value: {{ .Values.secrets.zitadel.keys.frontendClientId }}
+            - name: K8S_KEY_WEBHOOK_IDP_SYNC_KEY
+              value: {{ .Values.secrets.zitadel.keys.webhookIdpSyncKey }}
+            - name: K8S_KEY_WEBHOOK_COMPLEMENT_TOKEN_KEY
+              value: {{ .Values.secrets.zitadel.keys.webhookComplementTokenKey }}
           volumeMounts:
             - name: pat
               mountPath: /pat

@@ -1,5 +1,3 @@
-# Copyright (c) 2025 VH & Co BV. Licensed under the Business Source License 1.1. See LICENSE for details.
-#
 # StackWeaver Helm Chart — values.yaml
 # ─────────────────────────────────────
 # Override with --set or -f custom-values.yaml at install time.
@@ -111,7 +109,7 @@ secrets:
 # -- API (Go backend, port 8022) --
 api:
   image:
-    repository: ghcr.io/stackweaver/api
+    repository: ghcr.io/vhco-pro/stackweaver-api
     tag: latest
     pullPolicy: IfNotPresent
   replicas: 1
@@ -138,7 +136,7 @@ api:
 # -- Frontend (nginx-served SPA, port 80) --
 frontend:
   image:
-    repository: ghcr.io/stackweaver/frontend
+    repository: ghcr.io/vhco-pro/stackweaver-frontend
     tag: latest
     pullPolicy: IfNotPresent
   replicas: 1
@@ -158,7 +156,7 @@ frontend:
 # -- Orchestrator (background job scheduler) --
 orchestrator:
   image:
-    repository: ghcr.io/stackweaver/orchestrator
+    repository: ghcr.io/vhco-pro/stackweaver-orchestrator
     tag: latest
     pullPolicy: IfNotPresent
   replicas: 1
@@ -180,7 +178,7 @@ orchestrator:
 # -- Terraform Runner --
 runner:
   image:
-    repository: ghcr.io/stackweaver/runner
+    repository: ghcr.io/vhco-pro/stackweaver-runner
     tag: latest
     pullPolicy: IfNotPresent
   replicas: 1
@@ -199,7 +197,7 @@ runner:
 # -- Ansible Runner --
 ansibleRunner:
   image:
-    repository: ghcr.io/stackweaver/ansible-runner
+    repository: ghcr.io/vhco-pro/stackweaver-ansible-runner
     tag: latest
     pullPolicy: IfNotPresent
   replicas: 1
@@ -331,7 +329,7 @@ zitadel:
         memory: 256Mi
   init:
     image:
-      repository: ghcr.io/stackweaver/zitadel-init
+      repository: ghcr.io/vhco-pro/stackweaver-zitadel-init
       tag: latest
     adminUsername: "admin@ZITADEL.localhost"
     resources: {}

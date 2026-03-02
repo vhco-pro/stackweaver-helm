@@ -1,7 +1,3 @@
-{{/*
-Copyright (c) 2025 VH & Co BV. Licensed under the Business Source License 1.1.
-*/}}
-
 ────────────────────────────────────────────────────────────
   StackWeaver has been installed.
 ────────────────────────────────────────────────────────────
@@ -37,22 +33,15 @@ All secrets are managed externally. The chart did not create any Secret resource
 
 ── Zitadel Initialization ──
 
-After Zitadel starts, the zitadel-init Job will automatically:
+The zitadel-init Job will run automatically and:
   1. Create the StackWeaver organisation, project, and OIDC apps
   2. Create service users and PATs
   3. Configure webhooks and IdP sync
+  4. Write all credentials directly into the Zitadel secret
+  5. Trigger rolling restarts of the API, frontend, and login-ui
 
-The init job outputs credentials (clientId, clientSecret, etc.) that must
-be added to the Zitadel secret for the API and frontend to function:
-
-  kubectl logs job/{{ include "stackweaver.fullname" . }}-zitadel-init
-
-Then update the secret:
-  kubectl patch secret {{ include "stackweaver.secrets.zitadel" . }} --type merge \
-    -p '{"stringData": {"client-id": "<value>", ...}}'
-
-And restart the API:
-  kubectl rollout restart deployment/{{ include "stackweaver.fullname" . }}-api
+No manual steps are required. To monitor progress:
+  kubectl logs -f job/{{ include "stackweaver.fullname" . }}-zitadel-init
 {{- end }}
 
 For documentation: https://github.com/stackweaver/stackweaver

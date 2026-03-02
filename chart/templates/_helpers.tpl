@@ -1,10 +1,4 @@
 {{/*
-Copyright (c) 2025 VH & Co BV. Licensed under the Business Source License 1.1.
-
-StackWeaver Helm Chart — shared template helpers.
-*/}}
-
-{{/*
 Chart name (truncated to 63 chars, no trailing dash).
 */}}
 {{- define "stackweaver.name" -}}
