@@ -181,7 +181,7 @@ orchestrator:
 runner:
   image:
     repository: ghcr.io/stackweaver/runner
-    tag: latest
+    tag: 0.0.5
     pullPolicy: IfNotPresent
   replicas: 1
   resources:
