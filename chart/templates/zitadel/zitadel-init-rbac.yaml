@@ -1,0 +1,46 @@
+{{- if .Values.zitadel.bundled }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "stackweaver.fullname" . }}-zitadel-init
+  labels:
+    {{- include "stackweaver.labels" . | nindent 4 }}
+    app.kubernetes.io/component: zitadel-init
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "stackweaver.fullname" . }}-zitadel-init
+  labels:
+    {{- include "stackweaver.labels" . | nindent 4 }}
+    app.kubernetes.io/component: zitadel-init
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames: ["{{ include "stackweaver.secrets.zitadel" . }}"]
+    verbs: ["get", "patch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    resourceNames:
+      - "{{ include "stackweaver.fullname" . }}-api"
+      - "{{ include "stackweaver.fullname" . }}-frontend"
+      - "{{ include "stackweaver.fullname" . }}-login-ui"
+    verbs: ["get", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "stackweaver.fullname" . }}-zitadel-init
+  labels:
+    {{- include "stackweaver.labels" . | nindent 4 }}
+    app.kubernetes.io/component: zitadel-init
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "stackweaver.fullname" . }}-zitadel-init
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "stackweaver.fullname" . }}-zitadel-init
+    namespace: {{ .Release.Namespace }}
+{{- end }}
