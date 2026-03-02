@@ -139,7 +139,7 @@ api:
 frontend:
   image:
     repository: ghcr.io/stackweaver/frontend
-    tag: latest
+    tag: 0.0.9
     pullPolicy: IfNotPresent
   replicas: 1
   port: 80
@@ -332,7 +332,7 @@ zitadel:
   init:
     image:
       repository: ghcr.io/stackweaver/zitadel-init
-      tag: latest
+      tag: 0.0.5
     adminUsername: "admin@ZITADEL.localhost"
     resources: {}
   # External Zitadel settings (when bundled=false)
