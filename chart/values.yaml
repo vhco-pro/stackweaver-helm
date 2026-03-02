@@ -17,17 +17,13 @@
 
 global:
   imagePullSecrets: []
-
 nameOverride: ""
 fullnameOverride: ""
-
 # ── Service Account ───────────────────────────────────────────────────────────
-
 serviceAccount:
   create: true
   name: ""
   annotations: {}
-
 # ── Ingress ───────────────────────────────────────────────────────────────────
 #
 # Two-domain layout:
@@ -36,7 +32,6 @@ serviceAccount:
 #
 # The API is routed via /api/v2, /.well-known/terraform.json, /v1/modules, /health.
 # Everything else on the app host goes to the frontend.
-
 ingress:
   enabled: true
   className: nginx
@@ -48,7 +43,6 @@ ingress:
   hosts:
     app: stackweaver.example.com
     auth: auth.stackweaver.example.com
-
 # ── External Secrets ──────────────────────────────────────────────────────────
 #
 # For each component, you can either:
@@ -59,7 +53,6 @@ ingress:
 #
 # The "keys" mapping tells the chart which key name to read from the Secret.
 # Only change these if your external Secret uses different key names.
-
 secrets:
   # PostgreSQL credentials
   # Auto-generates a random 24-char password when secretName is empty.
@@ -67,13 +60,11 @@ secrets:
     secretName: ""
     keys:
       password: password
-
   # Redis credentials (optional — only needed if Redis auth is enabled)
   redis:
     secretName: ""
     keys:
       password: password
-
   # MinIO / S3 credentials
   # Auto-generates access-key ("minioadmin") + random secret-key when empty.
   minio:
@@ -81,7 +72,6 @@ secrets:
     keys:
       accessKey: access-key
       secretKey: secret-key
-
   # Encryption key — 32-byte hex string
   # Auto-generates a random key when secretName is empty.
   # Used by API, runner, and ansible-runner for encrypting variables/credentials.
@@ -89,7 +79,6 @@ secrets:
     secretName: ""
     keys:
       key: encryption-key
-
   # Zitadel credentials
   # Auto-generates masterkey + admin password when empty.
   # After zitadel-init runs, it populates clientId, clientSecret, etc.
@@ -105,21 +94,18 @@ secrets:
       frontendClientId: frontend-client-id
       webhookIdpSyncKey: webhook-idp-sync-key
       webhookComplementTokenKey: webhook-complement-token-key
-
   # OIDC workload identity signing key (optional — for Azure OIDC / inventory sync)
   # When secretName is empty, the chart auto-generates an RSA key pair.
   oidc:
     secretName: ""
     keys:
       signingKey: signing-key
-
   # GitHub App credentials (optional — for GitHub VCS integration)
   githubApp:
     secretName: ""
     keys:
       privateKey: private-key
       webhookSecret: webhook-secret
-
 # ── Core Components ───────────────────────────────────────────────────────────
 
 # -- API (Go backend, port 8022) --
@@ -149,7 +135,6 @@ api:
   githubApp:
     id: ""
     name: ""
-
 # -- Frontend (nginx-served SPA, port 80) --
 frontend:
   image:
@@ -170,12 +155,11 @@ frontend:
   nodeSelector: {}
   tolerations: []
   affinity: {}
-
 # -- Orchestrator (background job scheduler) --
 orchestrator:
   image:
     repository: ghcr.io/stackweaver/orchestrator
-    tag: latest
+    tag: 0.0.5
     pullPolicy: IfNotPresent
   replicas: 1
   resources:
@@ -193,7 +177,6 @@ orchestrator:
   githubApp:
     id: ""
     name: ""
-
 # -- Terraform Runner --
 runner:
   image:
@@ -213,7 +196,6 @@ runner:
   nodeSelector: {}
   tolerations: []
   affinity: {}
-
 # -- Ansible Runner --
 ansibleRunner:
   image:
@@ -233,9 +215,7 @@ ansibleRunner:
   nodeSelector: {}
   tolerations: []
   affinity: {}
-
 # ── Storage ───────────────────────────────────────────────────────────────────
-
 storage:
   # "minio" or "s3"
   provider: minio
@@ -245,14 +225,11 @@ storage:
   s3:
     region: us-east-1
     endpoint: ""
-
 # ── Runner Workspaces PVC ─────────────────────────────────────────────────────
-
 runnerWorkspaces:
   size: 10Gi
   storageClass: ""
   accessMode: ReadWriteMany
-
 # ── Dependencies ──────────────────────────────────────────────────────────────
 #
 # For each dependency, set enabled=true to deploy it in-cluster (bundled),
@@ -284,7 +261,6 @@ postgresql:
     username: ""
     database: ""
     sslmode: disable
-
 # -- Redis 7 --
 redis:
   enabled: true
@@ -301,7 +277,6 @@ redis:
   external:
     host: ""
     port: 6379
-
 # -- MinIO --
 minio:
   enabled: true
@@ -322,7 +297,6 @@ minio:
   external:
     endpoint: ""
     useSSL: false
-
 # -- Zitadel (OIDC Identity Provider) --
 # Zitadel is REQUIRED — the stack cannot function without it.
 # Set bundled=true to deploy Zitadel in this chart, or bundled=false to use
@@ -342,9 +316,8 @@ zitadel:
   config:
     accessTokenLifetime: 12h
     idTokenLifetime: 12h
-    refreshTokenIdleExpiration: 720h    # 30 days
-    refreshTokenExpiration: 2160h       # 90 days
-
+    refreshTokenIdleExpiration: 720h # 30 days
+    refreshTokenExpiration: 2160h # 90 days
   loginUI:
     image:
       repository: ghcr.io/zitadel/zitadel-login
@@ -356,29 +329,23 @@ zitadel:
       limits:
         cpu: 200m
         memory: 256Mi
-
   init:
     image:
       repository: ghcr.io/stackweaver/zitadel-init
       tag: latest
     adminUsername: "admin@ZITADEL.localhost"
     resources: {}
-
   # External Zitadel settings (when bundled=false)
   external:
     # Public issuer URL (e.g. https://auth.example.com)
     issuer: ""
     # In-cluster address for gRPC/HTTP calls (e.g. zitadel.other-namespace.svc:8080)
     internalAddr: ""
-
 # ── OIDC Workload Identity ───────────────────────────────────────────────────
-
 oidc:
   # Issuer URL for OIDC workload identity tokens (non-secret, can be left empty)
   issuerUrl: ""
-
 # ── SSO Configuration ─────────────────────────────────────────────────────────
-
 sso:
   enableOidcTeamSync: false
   oidcRemoveFromNonSsoTeams: false
