@@ -139,7 +139,7 @@ api:
 frontend:
   image:
     repository: ghcr.io/stackweaver/frontend
-    tag: 0.0.9
+    tag: latest
     pullPolicy: IfNotPresent
   replicas: 1
   port: 80
@@ -159,7 +159,7 @@ frontend:
 orchestrator:
   image:
     repository: ghcr.io/stackweaver/orchestrator
-    tag: 0.0.5
+    tag: latest
     pullPolicy: IfNotPresent
   replicas: 1
   resources:
@@ -181,7 +181,7 @@ orchestrator:
 runner:
   image:
     repository: ghcr.io/stackweaver/runner
-    tag: 0.0.5
+    tag: latest
     pullPolicy: IfNotPresent
   replicas: 1
   resources:
@@ -200,7 +200,7 @@ runner:
 ansibleRunner:
   image:
     repository: ghcr.io/stackweaver/ansible-runner
-    tag: 0.0.8
+    tag: latest
     pullPolicy: IfNotPresent
   replicas: 1
   resources:
@@ -332,7 +332,7 @@ zitadel:
   init:
     image:
       repository: ghcr.io/stackweaver/zitadel-init
-      tag: 0.0.5
+      tag: latest
     adminUsername: "admin@ZITADEL.localhost"
     resources: {}
   # External Zitadel settings (when bundled=false)
