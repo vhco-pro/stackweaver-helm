@@ -7,7 +7,7 @@ Helm chart for deploying [Stackweaver](https://github.com/vhco-pro/stackweaver) 
 
 ## Installation
 
-```bash
+```shell
 # Add the OCI registry (no separate helm repo add needed)
 helm install stackweaver oci://ghcr.io/vhco-pro/charts/stackweaver --version 0.1.2
 
