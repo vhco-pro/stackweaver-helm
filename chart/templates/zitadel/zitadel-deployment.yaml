@@ -100,5 +100,5 @@ spec:
             name: {{ include "stackweaver.fullname" . }}-zitadel-config
         - name: pat
           persistentVolumeClaim:
-            claimName: {{ include "stackweaver.fullname" . }}-zitadel-pat
+            claimName: {{ .Values.zitadel.pat.existingClaim | default (printf "%s-zitadel-pat" (include "stackweaver.fullname" .)) }}
 {{- end }}

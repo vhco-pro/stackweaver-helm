@@ -74,7 +74,7 @@ spec:
       volumes:
         - name: workspaces
           persistentVolumeClaim:
-            claimName: {{ include "stackweaver.fullname" . }}-runner-workspaces
+            claimName: {{ .Values.runnerWorkspaces.existingClaim | default (printf "%s-runner-workspaces" (include "stackweaver.fullname" .)) }}
       {{- with .Values.runner.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

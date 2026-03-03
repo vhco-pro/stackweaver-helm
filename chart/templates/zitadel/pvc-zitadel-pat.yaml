@@ -1,4 +1,4 @@
-{{- if .Values.zitadel.bundled }}
+{{- if and .Values.zitadel.bundled (not .Values.zitadel.pat.existingClaim) }}
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -8,8 +8,11 @@ metadata:
     app.kubernetes.io/component: zitadel
 spec:
   accessModes:
-    - ReadWriteMany
+    - {{ .Values.zitadel.pat.accessMode | default "ReadWriteMany" }}
   resources:
     requests:
-      storage: 1Mi
+      storage: {{ .Values.zitadel.pat.size | default "1Mi" }}
+  {{- if .Values.zitadel.pat.storageClass }}
+  storageClassName: {{ .Values.zitadel.pat.storageClass | quote }}
+  {{- end }}
 {{- end }}
