@@ -114,6 +114,10 @@ api:
     pullPolicy: IfNotPresent
   replicas: 1
   port: 8022
+  server:
+    host: "0.0.0.0"
+    readTimeout: "30s"
+    writeTimeout: "30s"
   corsExtraOrigins: ""
   resources:
     requests:
