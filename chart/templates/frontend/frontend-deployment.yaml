@@ -17,7 +17,7 @@ spec:
         {{- include "stackweaver.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: frontend
       annotations:
-        checksum/config: {{ include (print $.Template.BasePath "/configmap-frontend.yaml") . | sha256sum }}
+        checksum/config: {{ include (print $.Template.BasePath "/frontend/configmap-frontend.yaml") . | sha256sum }}
       {{- with .Values.frontend.podAnnotations }}
         {{- toYaml . | nindent 8 }}
       {{- end }}
@@ -65,10 +65,12 @@ spec:
               mountPath: /usr/share/nginx/html/env.js
               subPath: env.js
               readOnly: true
-          {{- range $key, $value := .Values.frontend.env }}
+          {{- with .Values.frontend.env }}
           env:
+            {{- range $key, $value := . }}
             - name: {{ $key }}
               value: {{ $value | quote }}
+            {{- end }}
           {{- end }}
           livenessProbe:
             httpGet:
