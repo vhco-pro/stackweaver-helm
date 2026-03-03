@@ -69,6 +69,12 @@ spec:
         - name: init-scripts
           configMap:
             name: {{ include "stackweaver.fullname" . }}-postgresql-init
+        {{- if .Values.postgresql.storage.existingClaim }}
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ .Values.postgresql.storage.existingClaim }}
+        {{- end }}
+  {{- if not .Values.postgresql.storage.existingClaim }}
   volumeClaimTemplates:
     - metadata:
         name: data
@@ -81,6 +87,10 @@ spec:
         {{- if .Values.postgresql.storage.storageClass }}
         storageClassName: {{ .Values.postgresql.storage.storageClass }}
         {{- end }}
+        {{- if .Values.postgresql.storage.volumeName }}
+        volumeName: {{ .Values.postgresql.storage.volumeName }}
+        {{- end }}
+  {{- end }}
 ---
 # Init SQL ConfigMap — enables uuid-ossp extension and creates zitadel database
 apiVersion: v1

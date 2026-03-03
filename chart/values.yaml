@@ -232,6 +232,7 @@ runnerWorkspaces:
   size: 10Gi
   storageClass: ""
   accessMode: ReadWriteMany
+  existingClaim: ""  # if set, skip PVC creation and use this pre-existing claim name
 # ── Dependencies ──────────────────────────────────────────────────────────────
 #
 # For each dependency, set enabled=true to deploy it in-cluster (bundled),
@@ -250,6 +251,8 @@ postgresql:
   storage:
     size: 10Gi
     storageClass: ""
+    existingClaim: ""  # if set, skip volumeClaimTemplate and use this pre-existing PVC
+    volumeName: ""     # if set, bind the new PVC to this specific pre-existing PV
   resources:
     requests:
       cpu: 100m
@@ -288,6 +291,8 @@ minio:
   storage:
     size: 10Gi
     storageClass: ""
+    existingClaim: ""  # if set, skip volumeClaimTemplate and use this pre-existing PVC
+    volumeName: ""     # if set, bind the new PVC to this specific pre-existing PV
   resources:
     requests:
       cpu: 100m
@@ -305,6 +310,11 @@ minio:
 # an external Zitadel instance. In both cases, provide credentials in secrets.zitadel.
 zitadel:
   bundled: true
+  pat:
+    existingClaim: ""     # if set, skip PAT PVC creation and use this pre-existing claim
+    size: 1Mi
+    storageClass: ""
+    accessMode: ReadWriteMany
   image:
     repository: ghcr.io/zitadel/zitadel
     tag: latest

@@ -66,6 +66,13 @@ spec:
               mountPath: /data
           resources:
             {{- toYaml .Values.minio.resources | nindent 12 }}
+      {{- if .Values.minio.storage.existingClaim }}
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ .Values.minio.storage.existingClaim }}
+      {{- end }}
+  {{- if not .Values.minio.storage.existingClaim }}
   volumeClaimTemplates:
     - metadata:
         name: data
@@ -78,4 +85,8 @@ spec:
         {{- if .Values.minio.storage.storageClass }}
         storageClassName: {{ .Values.minio.storage.storageClass }}
         {{- end }}
+        {{- if .Values.minio.storage.volumeName }}
+        volumeName: {{ .Values.minio.storage.volumeName }}
+        {{- end }}
+  {{- end }}
 {{- end }}
