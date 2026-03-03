@@ -18,7 +18,7 @@ spec:
         {{- include "stackweaver.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: zitadel
       annotations:
-        checksum/config: {{ include (print $.Template.BasePath "/configmap-zitadel.yaml") . | sha256sum }}
+        checksum/config: {{ include (print $.Template.BasePath "/zitadel/configmap-zitadel.yaml") . | sha256sum }}
     spec:
       {{- include "stackweaver.imagePullSecrets" . | nindent 6 }}
       # Run as root (Zitadel needs to write PAT file)
