@@ -34,6 +34,15 @@ spec:
           env:
             - name: LOG_LEVEL
               value: info
+            # ── Server ──
+            - name: SERVER_HOST
+              value: {{ .Values.api.server.host | default "0.0.0.0" | quote }}
+            - name: SERVER_PORT
+              value: {{ .Values.api.port | quote }}
+            - name: SERVER_READ_TIMEOUT
+              value: {{ .Values.api.server.readTimeout | default "30s" | quote }}
+            - name: SERVER_WRITE_TIMEOUT
+              value: {{ .Values.api.server.writeTimeout | default "30s" | quote }}
             # ── Database ──
             {{- include "stackweaver.env.database" . | nindent 12 }}
             # ── Redis ──
