@@ -21,12 +21,10 @@ data:
         Database: zitadel
         Admin:
           Username: {{ include "stackweaver.postgresql.username" . }}
-          Password: INJECTED_VIA_ENV
           SSL:
             Mode: {{ include "stackweaver.postgresql.sslmode" . }}
         User:
           Username: {{ include "stackweaver.postgresql.username" . }}
-          Password: INJECTED_VIA_ENV
           SSL:
             Mode: {{ include "stackweaver.postgresql.sslmode" . }}
 
