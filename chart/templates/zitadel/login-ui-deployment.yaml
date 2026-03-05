@@ -43,26 +43,18 @@ spec:
             # Docker Compose: network_mode: host means probes use localhost (trusted); no override needed.
             - name: CUSTOM_REQUEST_HEADERS
               value: "x-zitadel-instance-host:{{ .Values.ingress.hosts.auth }}"
+          # TCP socket probes: just verify the Next.js server is listening.
+          # httpGet probes on /ui/v2/login trigger SSR which calls Zitadel via gRPC;
+          # if Zitadel is slow the SSR hangs and the probe times out.
           livenessProbe:
-            httpGet:
-              path: /ui/v2/login
+            tcpSocket:
               port: http
-              # Set Host so login-ui forwards the auth domain (not the pod IP) as x-forwarded-host
-              # to Zitadel. Without this, Kubernetes probes hit the pod at its IP (e.g. 100.64.0.43:3000),
-              # login-ui derives x-forwarded-host from that IP, and Zitadel rejects it as untrusted.
-              httpHeaders:
-                - name: Host
-                  value: {{ .Values.ingress.hosts.auth }}
             initialDelaySeconds: 15
             periodSeconds: 30
             timeoutSeconds: 5
           readinessProbe:
-            httpGet:
-              path: /ui/v2/login
+            tcpSocket:
               port: http
-              httpHeaders:
-                - name: Host
-                  value: {{ .Values.ingress.hosts.auth }}
             initialDelaySeconds: 5
             periodSeconds: 10
             timeoutSeconds: 5
