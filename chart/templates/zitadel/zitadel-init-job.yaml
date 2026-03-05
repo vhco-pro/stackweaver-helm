@@ -30,6 +30,10 @@ spec:
               value: "{{ include "stackweaver.zitadel.issuer" . }}/ui/v2/login"
             - name: ZITADEL_INTERNAL_ADDR
               value: {{ include "stackweaver.zitadel.internalAddr" . | quote }}
+            # ZITADEL_DOMAIN must match Zitadel's ExternalDomain so the gRPC :authority
+            # header resolves to the correct instance (not required for Docker Compose).
+            - name: ZITADEL_DOMAIN
+              value: {{ .Values.ingress.hosts.auth | quote }}
             - name: PROJECT_ROOT
               value: /config
             - name: ZITADEL_ADMIN_USERNAME
