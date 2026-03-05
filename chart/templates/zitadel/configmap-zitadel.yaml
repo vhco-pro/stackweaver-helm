@@ -49,7 +49,7 @@ data:
         LoginDefaultOrg: true
         LoginV2:
           Required: true
-          BaseURI: http://{{ include "stackweaver.fullname" . }}-login-ui:3000/ui/v2/login
+          BaseURI: {{ include "stackweaver.loginUI.baseURL" . }}
       OIDCSettings:
         AccessTokenLifetime: {{ .Values.zitadel.config.accessTokenLifetime | default "12h" }}
         IdTokenLifetime: {{ .Values.zitadel.config.idTokenLifetime | default "12h" }}

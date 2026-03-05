@@ -51,6 +51,10 @@ spec:
               value: {{ include "stackweaver.frontend.redirectURI" . | quote }}
             - name: FRONTEND_POST_LOGOUT_URI
               value: {{ include "stackweaver.app.url" . | quote }}
+            # Login V2 BaseURI — set via Feature API so it survives domain changes
+            # (DefaultInstance.Features.LoginV2.BaseURI in defaults.yaml only applies on first init)
+            - name: LOGIN_UI_BASE_URL
+              value: {{ include "stackweaver.loginUI.baseURL" . | quote }}
             # ── Kubernetes secret writer ──
             - name: K8S_SECRET_NAME
               value: {{ include "stackweaver.secrets.zitadel" . }}
