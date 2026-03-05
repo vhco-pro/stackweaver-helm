@@ -14,6 +14,16 @@ data:
     TLS:
       Enabled: false
 
+    # Use pod hostname for Sonyflake machine ID instead of private IP / GCP metadata.
+    # Docker Compose uses network_mode: host (host IP is visible), but in Kubernetes each
+    # pod has its own network namespace and IP detection fails with "no private ip address".
+    Machine:
+      Identification:
+        PrivateIp:
+          Enabled: false
+        Hostname:
+          Enabled: true
+
     Database:
       Postgres:
         Host: {{ include "stackweaver.postgresql.host" . }}
