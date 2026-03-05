@@ -345,6 +345,7 @@ zitadel:
     image:
       repository: ghcr.io/vhco-pro/stackweaver-zitadel-init
       tag: latest
+      pullPolicy: IfNotPresent
     adminUsername: "admin@ZITADEL.localhost"
     resources: {}
   # External Zitadel settings (when bundled=false)

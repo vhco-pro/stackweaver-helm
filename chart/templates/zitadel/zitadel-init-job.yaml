@@ -25,6 +25,7 @@ spec:
       containers:
         - name: zitadel-init
           image: "{{ .Values.zitadel.init.image.repository }}:{{ .Values.zitadel.init.image.tag }}"
+          imagePullPolicy: {{ .Values.zitadel.init.image.pullPolicy }}
           env:
             - name: ZITADEL_ISSUER
               value: "{{ include "stackweaver.zitadel.issuer" . }}/ui/v2/login"
