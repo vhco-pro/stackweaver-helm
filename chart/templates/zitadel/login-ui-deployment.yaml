@@ -40,17 +40,19 @@ spec:
             - name: EMAIL_VERIFICATION
               value: "false"
             # x-zitadel-instance-host: tells Zitadel which instance to serve (by ExternalDomain).
-            # x-forwarded-host: overrides the publicHostname Zitadel derives from the incoming
-            # connection. Without this, Kubernetes health-check probes hit the pod at its pod IP
-            # (e.g. 100.64.0.43:3000), the login-ui forwards that as x-forwarded-host, and
-            # Zitadel rejects it because the pod IP is not a trusted domain.
             # Docker Compose: network_mode: host means probes use localhost (trusted); no override needed.
             - name: CUSTOM_REQUEST_HEADERS
-              value: "x-zitadel-instance-host:{{ .Values.ingress.hosts.auth }},x-forwarded-host:{{ .Values.ingress.hosts.auth }}"
+              value: "x-zitadel-instance-host:{{ .Values.ingress.hosts.auth }}"
           livenessProbe:
             httpGet:
               path: /ui/v2/login
               port: http
+              # Set Host so login-ui forwards the auth domain (not the pod IP) as x-forwarded-host
+              # to Zitadel. Without this, Kubernetes probes hit the pod at its IP (e.g. 100.64.0.43:3000),
+              # login-ui derives x-forwarded-host from that IP, and Zitadel rejects it as untrusted.
+              httpHeaders:
+                - name: Host
+                  value: {{ .Values.ingress.hosts.auth }}
             initialDelaySeconds: 15
             periodSeconds: 30
             timeoutSeconds: 5
@@ -58,6 +60,9 @@ spec:
             httpGet:
               path: /ui/v2/login
               port: http
+              httpHeaders:
+                - name: Host
+                  value: {{ .Values.ingress.hosts.auth }}
             initialDelaySeconds: 5
             periodSeconds: 10
             timeoutSeconds: 5
