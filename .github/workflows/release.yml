@@ -20,7 +20,13 @@ jobs:
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
-
+      - name: Get latest commit message via API
+        run: |
+          # No need to even checkout the full repo if you just want the message
+          MSG=$(gh api repos/${{ github.repository }}/commits/${{ github.sha }} --template '{{.commit.message}}')
+          echo "commit_msg=$MSG" >> $GITHUB_OUTPUT
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Install Helm
         uses: azure/setup-helm@v4
 
