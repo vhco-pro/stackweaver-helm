@@ -103,6 +103,9 @@ spec:
                   key: {{ .Values.secrets.minio.keys.secretKey }}
             - name: MINIO_USE_SSL
               value: {{ include "stackweaver.minio.useSSL" . | quote }}
+            # ── App URL (used by GitHub Setup URL relay and status check links) ──
+            - name: STACKWEAVER_APP_URL
+              value: {{ include "stackweaver.app.url" . | quote }}
             # ── GitHub App ──
             {{- if .Values.secrets.githubApp.secretName }}
             - name: GITHUB_APP_ID
