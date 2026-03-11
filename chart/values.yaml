@@ -310,11 +310,6 @@ minio:
 # an external Zitadel instance. In both cases, provide credentials in secrets.zitadel.
 zitadel:
   bundled: true
-  pat:
-    existingClaim: ""     # if set, skip PAT PVC creation and use this pre-existing claim
-    size: 1Mi
-    storageClass: ""
-    accessMode: ReadWriteMany
   image:
     repository: ghcr.io/zitadel/zitadel
     tag: latest
