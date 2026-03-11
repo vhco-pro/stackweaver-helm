@@ -21,6 +21,7 @@ spec:
         checksum/config: {{ include (print $.Template.BasePath "/zitadel/configmap-zitadel.yaml") . | sha256sum }}
     spec:
       {{- include "stackweaver.imagePullSecrets" . | nindent 6 }}
+      serviceAccountName: {{ include "stackweaver.fullname" . }}-zitadel-init
       # Run as root (Zitadel needs to write PAT file)
       securityContext:
         runAsUser: 0
@@ -105,11 +106,93 @@ spec:
             timeoutSeconds: 5
           resources:
             {{- toYaml .Values.zitadel.resources | nindent 12 }}
+        # ── zitadel-init sidecar ──
+        # Waits for Zitadel to become ready, reads the admin PAT from the shared
+        # emptyDir, provisions OIDC apps / service users via gRPC, patches the
+        # K8s Secret with the resulting credentials, and restarts consumers.
+        # After provisioning it idles so the pod stays Running.
+        - name: zitadel-init
+          image: "{{ .Values.zitadel.init.image.repository }}:{{ .Values.zitadel.init.image.tag }}"
+          imagePullPolicy: {{ .Values.zitadel.init.image.pullPolicy }}
+          env:
+            - name: ZITADEL_ISSUER
+              value: "{{ include "stackweaver.zitadel.issuer" . }}/ui/v2/login"
+            # Use localhost since we're in the same pod as Zitadel
+            - name: ZITADEL_INTERNAL_ADDR
+              value: "localhost:8080"
+            # ZITADEL_DOMAIN must match Zitadel's ExternalDomain so the gRPC
+            # :authority header resolves to the correct instance.
+            - name: ZITADEL_DOMAIN
+              value: {{ .Values.ingress.hosts.auth | quote }}
+            - name: PROJECT_ROOT
+              value: /config
+            - name: ZITADEL_ADMIN_USERNAME
+              value: {{ .Values.zitadel.init.adminUsername | quote }}
+            - name: ZITADEL_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "stackweaver.secrets.zitadel" . }}
+                  key: {{ .Values.secrets.zitadel.keys.adminPassword }}
+            - name: ZITADEL_PAT_PATH
+              value: /pat/admin.pat
+            # Frontend redirect URIs
+            - name: FRONTEND_REDIRECT_URI
+              value: {{ include "stackweaver.frontend.redirectURI" . | quote }}
+            - name: FRONTEND_POST_LOGOUT_URI
+              value: {{ include "stackweaver.app.url" . | quote }}
+            # Login V2 BaseURI
+            - name: LOGIN_UI_BASE_URL
+              value: {{ include "stackweaver.loginUI.baseURL" . | quote }}
+            # ── Kubernetes secret writer ──
+            - name: K8S_SECRET_NAME
+              value: {{ include "stackweaver.secrets.zitadel" . }}
+            - name: K8S_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: K8S_API_DEPLOYMENT
+              value: {{ include "stackweaver.fullname" . }}-api
+            - name: K8S_FRONTEND_DEPLOYMENT
+              value: {{ include "stackweaver.fullname" . }}-frontend
+            - name: K8S_LOGIN_UI_DEPLOYMENT
+              value: {{ include "stackweaver.fullname" . }}-login-ui
+            # Secret key name overrides
+            - name: K8S_KEY_CLIENT_ID
+              value: {{ .Values.secrets.zitadel.keys.clientId }}
+            - name: K8S_KEY_CLIENT_SECRET
+              value: {{ .Values.secrets.zitadel.keys.clientSecret }}
+            - name: K8S_KEY_LOGIN_SERVICE_USER_TOKEN
+              value: {{ .Values.secrets.zitadel.keys.loginServiceUserToken }}
+            - name: K8S_KEY_FRONTEND_CLIENT_ID
+              value: {{ .Values.secrets.zitadel.keys.frontendClientId }}
+            - name: K8S_KEY_WEBHOOK_IDP_SYNC_KEY
+              value: {{ .Values.secrets.zitadel.keys.webhookIdpSyncKey }}
+            - name: K8S_KEY_WEBHOOK_COMPLEMENT_TOKEN_KEY
+              value: {{ .Values.secrets.zitadel.keys.webhookComplementTokenKey }}
+          ports:
+            - name: health
+              containerPort: 8081
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: health
+            initialDelaySeconds: 300
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          volumeMounts:
+            - name: pat
+              mountPath: /pat
+              readOnly: true
+          {{- with .Values.zitadel.init.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
       volumes:
         - name: config
           configMap:
             name: {{ include "stackweaver.fullname" . }}-zitadel-config
         - name: pat
-          persistentVolumeClaim:
-            claimName: {{ .Values.zitadel.pat.existingClaim | default (printf "%s-zitadel-pat" (include "stackweaver.fullname" .)) }}
+          emptyDir: {}
 {{- end }}

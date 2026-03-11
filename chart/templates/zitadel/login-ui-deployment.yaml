@@ -19,6 +19,18 @@ spec:
         app.kubernetes.io/component: login-ui
     spec:
       {{- include "stackweaver.imagePullSecrets" . | nindent 6 }}
+      initContainers:
+        - name: wait-for-zitadel
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              until wget -qO- http://{{ include "stackweaver.fullname" . }}-zitadel:8080/debug/ready >/dev/null 2>&1; do
+                echo "Waiting for Zitadel at {{ include "stackweaver.fullname" . }}-zitadel:8080..."
+                sleep 3
+              done
+              echo "Zitadel is ready."
       containers:
         - name: login-ui
           image: "{{ .Values.zitadel.loginUI.image.repository }}:{{ .Values.zitadel.loginUI.image.tag }}"
