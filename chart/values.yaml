@@ -86,6 +86,7 @@ secrets:
     keys:
       masterkey: masterkey
       adminPassword: admin-password
+      adminUsername: admin-username
       clientId: client-id
       clientSecret: client-secret
       loginServiceUserToken: login-service-user-token
@@ -341,7 +342,11 @@ zitadel:
       repository: ghcr.io/vhco-pro/stackweaver-zitadel-init
       tag: latest
       pullPolicy: IfNotPresent
-    adminUsername: "admin@ZITADEL.localhost"
+    # Email address for the initial Zitadel admin account.
+    # Written to the zitadel secret under "admin-username" so operators can discover it
+    # without reading the docs. Only effective on first install — changing after
+    # install has no effect (Zitadel FirstInstance config only runs once).
+    adminUsername: "admin@stackweaver.local"
     resources: {}
   # External Zitadel settings (when bundled=false)
   external:
