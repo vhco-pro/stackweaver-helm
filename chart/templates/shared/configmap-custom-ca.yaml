@@ -1,0 +1,11 @@
+{{- if and .Values.customCA.cert (not .Values.customCA.existingSecret) (not .Values.customCA.existingConfigMap) }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "stackweaver.fullname" . }}-custom-ca
+  labels:
+    {{- include "stackweaver.labels" . | nindent 4 }}
+data:
+  {{ .Values.customCA.key | default "ca.crt" }}: |
+    {{- .Values.customCA.cert | nindent 4 }}
+{{- end }}
