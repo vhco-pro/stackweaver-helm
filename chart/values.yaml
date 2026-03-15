@@ -316,11 +316,11 @@ zitadel:
     tag: latest
   resources:
     requests:
-      cpu: 100m
-      memory: 256Mi
-    limits:
       cpu: 500m
       memory: 512Mi
+    limits:
+      cpu: "2"
+      memory: 1Gi
   config:
     accessTokenLifetime: 12h
     idTokenLifetime: 12h
