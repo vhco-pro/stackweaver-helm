@@ -362,3 +362,37 @@ oidc:
 sso:
   enableOidcTeamSync: false
   oidcRemoveFromNonSsoTeams: false
+# ── Custom CA Certificates ─────────────────────────────────────────────────
+#
+# Mount a custom CA certificate bundle into all Go service containers.
+# Required when an upstream service (e.g. an external Zitadel instance) is
+# signed by an internal/corporate CA not present in the default system trust
+# store — which causes "x509: certificate signed by unknown authority" errors.
+#
+# Three source options (evaluated in priority order):
+#
+#   existingSecret    — name of a pre-existing Kubernetes Secret
+#   existingConfigMap — name of a pre-existing Kubernetes ConfigMap
+#   cert              — PEM-encoded certificate(s) pasted inline; the chart
+#                       creates a ConfigMap from this value automatically
+#
+# The cert is mounted at /etc/ssl/certs/custom-ca.crt via subPath (so the
+# system cert directory is not replaced). Go's crypto/x509 package scans
+# /etc/ssl/certs/ automatically on Linux, so no extra env vars are needed.
+customCA:
+  # Inline PEM-encoded CA certificate(s). The chart creates a ConfigMap from
+  # this value. Ignored when existingSecret or existingConfigMap is set.
+  # Example (use | to preserve newlines in YAML):
+  #   cert: |
+  #     -----BEGIN CERTIFICATE-----
+  #     ...
+  #     -----END CERTIFICATE-----
+  cert: ""
+  # Name of a pre-existing Kubernetes ConfigMap containing the CA cert.
+  # Ignored when existingSecret is set.
+  existingConfigMap: ""
+  # Name of a pre-existing Kubernetes Secret containing the CA cert.
+  # Takes highest priority when set.
+  existingSecret: ""
+  # Key within the Secret or ConfigMap that holds the PEM-encoded cert(s).
+  key: ca.crt

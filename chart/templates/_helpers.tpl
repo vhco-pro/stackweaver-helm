@@ -335,3 +335,48 @@ Encryption key env var — shared between api, runner, ansible-runner.
       name: {{ include "stackweaver.secrets.encryption" . }}
       key: {{ .Values.secrets.encryption.keys.key }}
 {{- end }}
+
+{{/* ── Custom CA certificate helpers ──────────────────────────────────── */}}
+
+{{/*
+Returns a non-empty string when any custom CA source is configured.
+Use as a truthy check: {{- if include "stackweaver.customCA.enabled" . }}
+*/}}
+{{- define "stackweaver.customCA.enabled" -}}
+{{- if or .Values.customCA.existingSecret .Values.customCA.existingConfigMap .Values.customCA.cert }}true{{- end }}
+{{- end }}
+
+{{/*
+Volume definition for the custom CA — emits nothing when disabled.
+Include with nindent inside a volumes: list.
+*/}}
+{{- define "stackweaver.customCA.volume" -}}
+{{- if .Values.customCA.existingSecret }}
+- name: custom-ca
+  secret:
+    secretName: {{ .Values.customCA.existingSecret }}
+{{- else if .Values.customCA.existingConfigMap }}
+- name: custom-ca
+  configMap:
+    name: {{ .Values.customCA.existingConfigMap }}
+{{- else if .Values.customCA.cert }}
+- name: custom-ca
+  configMap:
+    name: {{ include "stackweaver.fullname" . }}-custom-ca
+{{- end }}
+{{- end }}
+
+{{/*
+VolumeMount for the custom CA — emits nothing when disabled.
+Mounted at /etc/ssl/certs/custom-ca.crt via subPath so the system cert
+directory is not replaced. Go's crypto/x509 scans /etc/ssl/certs/ on Linux.
+Include with nindent inside a volumeMounts: list.
+*/}}
+{{- define "stackweaver.customCA.volumeMount" -}}
+{{- if include "stackweaver.customCA.enabled" . }}
+- name: custom-ca
+  mountPath: /etc/ssl/certs/custom-ca.crt
+  subPath: {{ .Values.customCA.key | default "ca.crt" }}
+  readOnly: true
+{{- end }}
+{{- end }}
