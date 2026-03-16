@@ -1,0 +1,84 @@
+name: Bug Report
+description: Report a bug with the Stackweaver Helm chart
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug. Please fill out the details below so we can investigate.
+
+  - type: input
+    id: chart-version
+    attributes:
+      label: Chart version
+      description: Which version of the Helm chart are you using?
+      placeholder: e.g. 0.0.3
+    validations:
+      required: true
+
+  - type: input
+    id: kubernetes-version
+    attributes:
+      label: Kubernetes version
+      description: "Output of `kubectl version --short` or your cluster version."
+      placeholder: e.g. 1.30.2
+    validations:
+      required: true
+
+  - type: input
+    id: helm-version
+    attributes:
+      label: Helm version
+      description: "Output of `helm version --short`."
+      placeholder: e.g. v3.16.1
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Describe the bug
+      description: A clear and concise description of what the bug is.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Steps to reproduce the behavior.
+      value: |
+        1. Install the chart with `helm install ...`
+        2.
+        3.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What you expected to happen.
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: What actually happened. Include error messages, logs, or `helm status` output if applicable.
+    validations:
+      required: true
+
+  - type: textarea
+    id: values
+    attributes:
+      label: Values overrides
+      description: Relevant values you passed to the chart (redact any secrets).
+      render: yaml
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Any other context, screenshots, or log output.
