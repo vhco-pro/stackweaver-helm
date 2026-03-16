@@ -69,12 +69,14 @@ spec:
           volumeMounts:
             - name: workspaces
               mountPath: /home/iac/workspaces
+            {{- include "stackweaver.customCA.volumeMount" . | nindent 12 }}
           resources:
             {{- toYaml .Values.runner.resources | nindent 12 }}
       volumes:
         - name: workspaces
           persistentVolumeClaim:
             claimName: {{ .Values.runnerWorkspaces.existingClaim | default (printf "%s-runner-workspaces" (include "stackweaver.fullname" .)) }}
+        {{- include "stackweaver.customCA.volume" . | nindent 8 }}
       {{- with .Values.runner.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

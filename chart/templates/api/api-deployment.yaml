@@ -167,11 +167,14 @@ spec:
             - name: {{ $key }}
               value: {{ $value | quote }}
             {{- end }}
-          {{- if .Values.secrets.githubApp.secretName }}
+          {{- if or .Values.secrets.githubApp.secretName (include "stackweaver.customCA.enabled" .) }}
           volumeMounts:
+            {{- if .Values.secrets.githubApp.secretName }}
             - name: github-app-key
               mountPath: /etc/github-app
               readOnly: true
+            {{- end }}
+            {{- include "stackweaver.customCA.volumeMount" . | nindent 12 }}
           {{- end }}
           livenessProbe:
             httpGet:
@@ -189,14 +192,17 @@ spec:
             timeoutSeconds: 5
           resources:
             {{- toYaml .Values.api.resources | nindent 12 }}
-      {{- if .Values.secrets.githubApp.secretName }}
+      {{- if or .Values.secrets.githubApp.secretName (include "stackweaver.customCA.enabled" .) }}
       volumes:
+        {{- if .Values.secrets.githubApp.secretName }}
         - name: github-app-key
           secret:
             secretName: {{ .Values.secrets.githubApp.secretName }}
             items:
               - key: {{ .Values.secrets.githubApp.keys.privateKey }}
                 path: private-key.pem
+        {{- end }}
+        {{- include "stackweaver.customCA.volume" . | nindent 8 }}
       {{- end }}
       {{- with .Values.api.nodeSelector }}
       nodeSelector:
