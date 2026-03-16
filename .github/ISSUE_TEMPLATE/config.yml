@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Stackweaver Documentation
+    url: https://sw.vhco.pro/docs
+    about: Check the docs for setup guides and configuration reference.
+  # - name: Discussions
+  #   url: https://github.com/vhco-pro/stackweaver/discussions
+  #   about: Ask questions and share ideas in GitHub Discussions.
