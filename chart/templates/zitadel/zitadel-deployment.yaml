@@ -169,6 +169,41 @@ spec:
               value: {{ .Values.secrets.zitadel.keys.webhookIdpSyncKey }}
             - name: K8S_KEY_WEBHOOK_COMPLEMENT_TOKEN_KEY
               value: {{ .Values.secrets.zitadel.keys.webhookComplementTokenKey }}
+            # ── SSO / IdP configuration ──
+            {{- if .Values.sso.azureAd.clientId }}
+            - name: AZURE_AD_CLIENT_ID
+              value: {{ .Values.sso.azureAd.clientId | quote }}
+            {{- if .Values.sso.azureAd.tenantId }}
+            - name: AZURE_AD_TENANT_ID
+              value: {{ .Values.sso.azureAd.tenantId | quote }}
+            {{- end }}
+            {{- if .Values.sso.secretName }}
+            - name: AZURE_AD_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.sso.secretName }}
+                  key: azure-ad-client-secret
+            {{- end }}
+            {{- end }}
+            {{- if .Values.sso.oidcProvider.clientId }}
+            - name: OIDC_IDP_CLIENT_ID
+              value: {{ .Values.sso.oidcProvider.clientId | quote }}
+            {{- if .Values.sso.oidcProvider.name }}
+            - name: OIDC_IDP_NAME
+              value: {{ .Values.sso.oidcProvider.name | quote }}
+            {{- end }}
+            {{- if .Values.sso.oidcProvider.issuer }}
+            - name: OIDC_IDP_ISSUER
+              value: {{ .Values.sso.oidcProvider.issuer | quote }}
+            {{- end }}
+            {{- if .Values.sso.secretName }}
+            - name: OIDC_IDP_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.sso.secretName }}
+                  key: oidc-idp-client-secret
+            {{- end }}
+            {{- end }}
           ports:
             - name: health
               containerPort: 8081
