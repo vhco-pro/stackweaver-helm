@@ -182,7 +182,7 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.sso.secretName }}
-                  key: azure-ad-client-secret
+                  key: {{ .Values.sso.keys.azureAdClientSecret }}
             {{- end }}
             {{- end }}
             {{- if .Values.sso.oidcProvider.clientId }}
@@ -201,7 +201,7 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.sso.secretName }}
-                  key: oidc-idp-client-secret
+                  key: {{ .Values.sso.keys.oidcProviderClientSecret }}
             {{- end }}
             {{- end }}
           ports:

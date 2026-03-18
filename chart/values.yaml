@@ -380,11 +380,13 @@ sso:
     issuer: ""     # OIDC issuer URL (must serve /.well-known/openid-configuration)
     clientId: ""
   # Pre-existing K8s Secret containing SSO client secrets.
-  # Required keys depend on your provider:
-  #   Azure AD:       azure-ad-client-secret
-  #   Generic OIDC:   oidc-idp-client-secret
   # Both keys are needed if you configure Azure AD and a Generic OIDC provider simultaneously.
   secretName: ""
+  # Key names within the Secret. Override these if your existing Secret uses
+  # different key names (e.g. from External Secrets Operator or Sealed Secrets).
+  keys:
+    azureAdClientSecret: azure-ad-client-secret
+    oidcProviderClientSecret: oidc-idp-client-secret
 # ── Custom CA Certificates ─────────────────────────────────────────────────
 #
 # Mount a custom CA certificate bundle into all Go service containers.
