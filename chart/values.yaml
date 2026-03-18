@@ -359,9 +359,32 @@ oidc:
   # Issuer URL for OIDC workload identity tokens (non-secret, can be left empty)
   issuerUrl: ""
 # ── SSO Configuration ─────────────────────────────────────────────────────────
+#
+# Configure an external identity provider for SSO login.
+# Only one of azureAd or oidcProvider can be active at a time (oidcProvider
+# covers Okta, AWS Cognito, and any generic OIDC provider).
+# Azure AD can be used alongside one oidcProvider.
+#
+# Non-secret values (client IDs, tenant ID, issuer URL) are set inline.
+# Secret values (client secrets) must be provided in a pre-existing K8s Secret.
 sso:
   enableOidcTeamSync: false
   oidcRemoveFromNonSsoTeams: false
+  # Azure AD / Entra ID
+  azureAd:
+    clientId: ""
+    tenantId: ""
+  # Generic OIDC provider (Okta, AWS Cognito, Keycloak, etc.)
+  oidcProvider:
+    name: ""       # Display name on the login button (e.g. "Okta", "AWS Cognito")
+    issuer: ""     # OIDC issuer URL (must serve /.well-known/openid-configuration)
+    clientId: ""
+  # Pre-existing K8s Secret containing SSO client secrets.
+  # Required keys depend on your provider:
+  #   Azure AD:       azure-ad-client-secret
+  #   Generic OIDC:   oidc-idp-client-secret
+  # Both keys are needed if you configure Azure AD and a Generic OIDC provider simultaneously.
+  secretName: ""
 # ── Custom CA Certificates ─────────────────────────────────────────────────
 #
 # Mount a custom CA certificate bundle into all Go service containers.
