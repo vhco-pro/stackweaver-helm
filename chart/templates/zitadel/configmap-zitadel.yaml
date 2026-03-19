@@ -38,6 +38,12 @@ data:
           SSL:
             Mode: {{ include "stackweaver.postgresql.sslmode" . }}
 
+    # Allow Actions V2 targets to call internal/cluster-local URLs.
+    # Zitadel v4.x blocks private/loopback IPs by default (SSRF protection).
+    # We need in-cluster calls from Zitadel → API for SSO group sync webhooks.
+    Executions:
+      DenyList: []
+
     DefaultInstance:
       LoginPolicy:
         AllowUsernamePassword: true
