@@ -169,6 +169,12 @@ spec:
               value: {{ .Values.secrets.zitadel.keys.webhookIdpSyncKey }}
             - name: K8S_KEY_WEBHOOK_COMPLEMENT_TOKEN_KEY
               value: {{ .Values.secrets.zitadel.keys.webhookComplementTokenKey }}
+            # ── Actions V2 API base URL ──
+            # Zitadel Actions V2 webhooks call the API to sync IdP claims.
+            # In Kubernetes the API runs in a separate pod, so we use the
+            # in-cluster service URL instead of localhost.
+            - name: ACTIONS_API_BASE_URL
+              value: "http://{{ include "stackweaver.fullname" . }}-api:{{ .Values.api.port }}"
             # ── SSO / IdP configuration ──
             {{- if .Values.sso.azureAd.clientId }}
             - name: AZURE_AD_CLIENT_ID
