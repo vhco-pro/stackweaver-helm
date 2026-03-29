@@ -138,14 +138,14 @@ api:
   githubApp:
     id: ""
     name: ""
-# -- Frontend (nginx-served SPA, port 80) --
+# -- Frontend (Chainguard nginx SPA, port 8080 — non-root) --
 frontend:
   image:
     repository: ghcr.io/vhco-pro/stackweaver-frontend
     tag: latest
     pullPolicy: IfNotPresent
   replicas: 1
-  port: 80
+  port: 8080
   resources:
     requests:
       cpu: 50m
