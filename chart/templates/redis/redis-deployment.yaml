@@ -41,16 +41,18 @@ spec:
           livenessProbe:
             exec:
               command:
-                - redis-cli
-                - ping
+                - sh
+                - -c
+                - redis-cli {{ if .Values.secrets.redis.secretName }}-a $REDIS_PASSWORD --no-auth-warning {{ end }}ping
             initialDelaySeconds: 10
             periodSeconds: 10
             timeoutSeconds: 5
           readinessProbe:
             exec:
               command:
-                - redis-cli
-                - ping
+                - sh
+                - -c
+                - redis-cli {{ if .Values.secrets.redis.secretName }}-a $REDIS_PASSWORD --no-auth-warning {{ end }}ping
             initialDelaySeconds: 5
             periodSeconds: 5
             timeoutSeconds: 3
