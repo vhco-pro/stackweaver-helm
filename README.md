@@ -9,11 +9,11 @@ Helm chart for deploying [Stackweaver](https://github.com/vhco-pro/stackweaver) 
 
 ```shell
 # Add the OCI registry (no separate helm repo add needed)
-helm install stackweaver oci://ghcr.io/vhco-pro/charts/stackweaver --version 0.5.0
+helm install stackweaver oci://ghcr.io/vhco-pro/charts/stackweaver --version 0.5.1
 
 # Or with custom values
 helm install stackweaver oci://ghcr.io/vhco-pro/charts/stackweaver \
-  --version 0.5.0 \
+  --version 0.5.1 \
   -f custom-values.yaml
 ```
 
