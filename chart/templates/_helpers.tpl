@@ -265,6 +265,57 @@ Frontend OIDC redirect URI.
 {{- printf "%s/auth/callback" (include "stackweaver.app.url" .) }}
 {{- end }}
 
+{{/* ── Ingress annotation helpers ─────────────────────────────────────── */}}
+
+{{/*
+App ingress annotations — provider presets + global + per-ingress overrides.
+Usage: {{- include "stackweaver.ingress.appAnnotations" . | nindent 4 }}
+*/}}
+{{- define "stackweaver.ingress.appAnnotations" -}}
+{{- if eq .Values.ingress.provider "community-nginx" }}
+nginx.ingress.kubernetes.io/use-regex: "true"
+nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+{{- else if eq .Values.ingress.provider "nginx-inc" }}
+nginx.org/path-regex: "case_sensitive"
+nginx.org/client-max-body-size: "100m"
+nginx.org/proxy-read-timeout: "3600s"
+nginx.org/proxy-send-timeout: "3600s"
+{{- else if eq .Values.ingress.provider "traefik" }}
+{{- /* Traefik uses middleware CRDs for timeouts and body size; no annotations needed */}}
+{{- end }}
+{{- with .Values.ingress.annotations }}
+{{ toYaml . }}
+{{- end }}
+{{- with .Values.ingress.appAnnotations }}
+{{ toYaml . }}
+{{- end }}
+{{- end }}
+
+{{/*
+Auth ingress annotations — provider presets + global + per-ingress overrides.
+Usage: {{- include "stackweaver.ingress.authAnnotations" . | nindent 4 }}
+*/}}
+{{- define "stackweaver.ingress.authAnnotations" -}}
+{{- if eq .Values.ingress.provider "community-nginx" }}
+nginx.ingress.kubernetes.io/use-regex: "true"
+nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+{{- else if eq .Values.ingress.provider "nginx-inc" }}
+nginx.org/path-regex: "case_sensitive"
+nginx.org/client-max-body-size: "10m"
+{{- else if eq .Values.ingress.provider "traefik" }}
+{{- /* Traefik uses middleware CRDs; no annotations needed */}}
+{{- end }}
+{{- with .Values.ingress.annotations }}
+{{ toYaml . }}
+{{- end }}
+{{- with .Values.ingress.authAnnotations }}
+{{ toYaml . }}
+{{- end }}
+{{- end }}
+
 {{/* ── Common env-var snippets (reused across deployments) ────────────── */}}
 
 {{/*

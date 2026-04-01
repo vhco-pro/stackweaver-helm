@@ -8,16 +8,7 @@ metadata:
     {{- include "stackweaver.labels" . | nindent 4 }}
     app.kubernetes.io/component: ingress
   annotations:
-    {{- with .Values.ingress.annotations }}
-    {{- toYaml . | nindent 4 }}
-    {{- end }}
-    # Enable regex matching for nginx (needed for path-based routing)
-    nginx.ingress.kubernetes.io/use-regex: "true"
-    # Increase body size for file uploads (Terraform state, modules, etc.)
-    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
-    # WebSocket support for log streaming
-    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
-    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    {{- include "stackweaver.ingress.appAnnotations" . | nindent 4 }}
 spec:
   {{- if .Values.ingress.className }}
   ingressClassName: {{ .Values.ingress.className }}
@@ -84,13 +75,7 @@ metadata:
     {{- include "stackweaver.labels" . | nindent 4 }}
     app.kubernetes.io/component: ingress-auth
   annotations:
-    {{- with .Values.ingress.annotations }}
-    {{- toYaml . | nindent 4 }}
-    {{- end }}
-    nginx.ingress.kubernetes.io/use-regex: "true"
-    # Zitadel uses gRPC — enable HTTP/2 backend protocol
-    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
-    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    {{- include "stackweaver.ingress.authAnnotations" . | nindent 4 }}
 spec:
   {{- if .Values.ingress.className }}
   ingressClassName: {{ .Values.ingress.className }}

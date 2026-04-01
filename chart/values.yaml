@@ -33,7 +33,17 @@ serviceAccount:
 ingress:
   enabled: true
   className: nginx
+  # Ingress controller provider — selects annotation presets.
+  # Options: nginx-inc | community-nginx | traefik | none
+  #   nginx-inc:        NGINX Inc ingress controller (nginx.org/* annotations) — default
+  #   community-nginx:  Community NGINX ingress controller (nginx.ingress.kubernetes.io/*) — sunset project
+  #   traefik:          Traefik ingress controller (minimal annotations; use middleware CRDs for advanced config)
+  #   none:             No controller-specific annotations — supply everything via annotations/appAnnotations/authAnnotations
+  provider: nginx-inc
   annotations: {}
+  # Per-ingress annotation overrides (merged on top of provider presets + annotations)
+  appAnnotations: {}
+  authAnnotations: {}
   tls:
     enabled: true
     secretName: stackweaver-tls
@@ -347,7 +357,13 @@ zitadel:
     # without reading the docs. Only effective on first install — changing after
     # install has no effect (Zitadel FirstInstance config only runs once).
     adminUsername: "admin@stackweaver.local"
-    resources: {}
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
   # External Zitadel settings (when bundled=false)
   external:
     # Public issuer URL (e.g. https://auth.example.com)

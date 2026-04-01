@@ -11,6 +11,7 @@ metadata:
     helm.sh/hook-weight: "5"
     helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
 spec:
+  ttlSecondsAfterFinished: 300
   backoffLimit: 10
   template:
     metadata:
@@ -23,6 +24,13 @@ spec:
       containers:
         - name: mc
           image: minio/mc:latest
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
           command:
             - /bin/sh
             - -c
