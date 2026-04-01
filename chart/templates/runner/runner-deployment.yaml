@@ -23,6 +23,9 @@ spec:
     spec:
       {{- include "stackweaver.imagePullSecrets" . | nindent 6 }}
       serviceAccountName: {{ include "stackweaver.serviceAccountName" . }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
       containers:
         - name: runner
           image: "{{ .Values.runner.image.repository }}:{{ .Values.runner.image.tag }}"
