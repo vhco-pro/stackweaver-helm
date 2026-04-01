@@ -77,7 +77,7 @@ data:
           Email:
             Address: {{ .Values.zitadel.init.adminUsername }}
             Verified: true
-          Password: INJECTED_VIA_ENV
+          # Password injected via ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORD env var
           PasswordChangeRequired: false
         Machine:
           Machine:

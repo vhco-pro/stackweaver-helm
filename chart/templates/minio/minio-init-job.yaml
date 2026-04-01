@@ -24,6 +24,8 @@ spec:
       containers:
         - name: mc
           image: minio/mc:latest
+          securityContext:
+            readOnlyRootFilesystem: true
           resources:
             requests:
               cpu: 50m
@@ -46,6 +48,11 @@ spec:
               mc mb --ignore-existing myminio/{{ .Values.storage.registryBucket }}
               mc mb --ignore-existing myminio/{{ .Values.storage.ansibleBucket }}
               echo "Buckets created successfully"
+          volumeMounts:
+            - name: mc-config
+              mountPath: /.mc
+            - name: tmp
+              mountPath: /tmp
           env:
             - name: MINIO_ROOT_USER
               valueFrom:
@@ -57,4 +64,9 @@ spec:
                 secretKeyRef:
                   name: {{ include "stackweaver.secrets.minio" . }}
                   key: {{ .Values.secrets.minio.keys.secretKey }}
+      volumes:
+        - name: mc-config
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
 {{- end }}

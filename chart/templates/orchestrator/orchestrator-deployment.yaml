@@ -30,6 +30,8 @@ spec:
         - name: orchestrator
           image: "{{ .Values.orchestrator.image.repository }}:{{ .Values.orchestrator.image.tag }}"
           imagePullPolicy: {{ .Values.orchestrator.image.pullPolicy }}
+          securityContext:
+            readOnlyRootFilesystem: true
           env:
             - name: LOG_LEVEL
               value: info
@@ -51,19 +53,20 @@ spec:
             - name: {{ $key }}
               value: {{ $value | quote }}
             {{- end }}
-          {{- if or .Values.secrets.githubApp.secretName (include "stackweaver.customCA.enabled" .) }}
           volumeMounts:
+            - name: tmp
+              mountPath: /tmp
             {{- if .Values.secrets.githubApp.secretName }}
             - name: github-app-key
               mountPath: /etc/github-app
               readOnly: true
             {{- end }}
             {{- include "stackweaver.customCA.volumeMount" . | nindent 12 }}
-          {{- end }}
           resources:
             {{- toYaml .Values.orchestrator.resources | nindent 12 }}
-      {{- if or .Values.secrets.githubApp.secretName (include "stackweaver.customCA.enabled" .) }}
       volumes:
+        - name: tmp
+          emptyDir: {}
         {{- if .Values.secrets.githubApp.secretName }}
         - name: github-app-key
           secret:
@@ -73,7 +76,6 @@ spec:
                 path: private-key.pem
         {{- end }}
         {{- include "stackweaver.customCA.volume" . | nindent 8 }}
-      {{- end }}
       {{- with .Values.orchestrator.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
