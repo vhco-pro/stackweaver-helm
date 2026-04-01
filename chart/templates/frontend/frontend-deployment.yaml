@@ -36,6 +36,8 @@ spec:
         {{- if .Values.zitadel.bundled }}
         - name: wait-for-zitadel
           image: busybox:1.36
+          securityContext:
+            readOnlyRootFilesystem: true
           resources:
             requests:
               cpu: 10m
@@ -55,6 +57,8 @@ spec:
         {{- end }}
         - name: inject-client-id
           image: busybox:1.36
+          securityContext:
+            readOnlyRootFilesystem: true
           resources:
             requests:
               cpu: 10m
@@ -86,6 +90,8 @@ spec:
         - name: frontend
           image: "{{ .Values.frontend.image.repository }}:{{ .Values.frontend.image.tag }}"
           imagePullPolicy: {{ .Values.frontend.image.pullPolicy }}
+          securityContext:
+            readOnlyRootFilesystem: true
           ports:
             - name: http
               containerPort: {{ .Values.frontend.port }}
@@ -95,6 +101,12 @@ spec:
               mountPath: /usr/share/nginx/html/env.js
               subPath: env.js
               readOnly: true
+            - name: nginx-cache
+              mountPath: /var/cache/nginx
+            - name: nginx-run
+              mountPath: /var/run
+            - name: tmp
+              mountPath: /tmp
           {{- with .Values.frontend.env }}
           env:
             {{- range $key, $value := . }}
@@ -123,6 +135,12 @@ spec:
           configMap:
             name: {{ include "stackweaver.fullname" . }}-frontend-config
         - name: config-out
+          emptyDir: {}
+        - name: nginx-cache
+          emptyDir: {}
+        - name: nginx-run
+          emptyDir: {}
+        - name: tmp
           emptyDir: {}
       {{- with .Values.frontend.nodeSelector }}
       nodeSelector:

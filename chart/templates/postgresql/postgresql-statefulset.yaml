@@ -20,9 +20,15 @@ spec:
         app.kubernetes.io/component: postgresql
     spec:
       {{- include "stackweaver.imagePullSecrets" . | nindent 6 }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        fsGroup: 999
       containers:
         - name: postgresql
           image: "{{ .Values.postgresql.image.repository }}:{{ .Values.postgresql.image.tag }}"
+          securityContext:
+            readOnlyRootFilesystem: true
           ports:
             - name: tcp-postgresql
               containerPort: 5432
@@ -63,12 +69,20 @@ spec:
             - name: init-scripts
               mountPath: /docker-entrypoint-initdb.d
               readOnly: true
+            - name: run
+              mountPath: /var/run/postgresql
+            - name: tmp
+              mountPath: /tmp
           resources:
             {{- toYaml .Values.postgresql.resources | nindent 12 }}
       volumes:
         - name: init-scripts
           configMap:
             name: {{ include "stackweaver.fullname" . }}-postgresql-init
+        - name: run
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
         {{- if .Values.postgresql.storage.existingClaim }}
         - name: data
           persistentVolumeClaim:

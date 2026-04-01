@@ -20,9 +20,15 @@ spec:
         app.kubernetes.io/component: minio
     spec:
       {{- include "stackweaver.imagePullSecrets" . | nindent 6 }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
       containers:
         - name: minio
           image: "{{ .Values.minio.image.repository }}:{{ .Values.minio.image.tag }}"
+          securityContext:
+            readOnlyRootFilesystem: true
           command:
             - minio
             - server
@@ -64,10 +70,14 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /data
+            - name: tmp
+              mountPath: /tmp
           resources:
             {{- toYaml .Values.minio.resources | nindent 12 }}
-      {{- if .Values.minio.storage.existingClaim }}
       volumes:
+        - name: tmp
+          emptyDir: {}
+      {{- if .Values.minio.storage.existingClaim }}
         - name: data
           persistentVolumeClaim:
             claimName: {{ .Values.minio.storage.existingClaim }}

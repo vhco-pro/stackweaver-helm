@@ -28,6 +28,8 @@ spec:
       initContainers:
         - name: wait-for-postgresql
           image: busybox:1.36
+          securityContext:
+            readOnlyRootFilesystem: true
           resources:
             requests:
               cpu: 10m
@@ -47,6 +49,8 @@ spec:
       containers:
         - name: zitadel
           image: "{{ .Values.zitadel.image.repository }}:{{ .Values.zitadel.image.tag }}"
+          securityContext:
+            readOnlyRootFilesystem: true
           args:
             - start-from-init
             - --config
@@ -96,6 +100,8 @@ spec:
               readOnly: true
             - name: pat
               mountPath: /pat
+            - name: tmp
+              mountPath: /tmp
           livenessProbe:
             httpGet:
               path: /debug/healthz
@@ -121,6 +127,8 @@ spec:
         - name: zitadel-init
           image: "{{ .Values.zitadel.init.image.repository }}:{{ .Values.zitadel.init.image.tag }}"
           imagePullPolicy: {{ .Values.zitadel.init.image.pullPolicy }}
+          securityContext:
+            readOnlyRootFilesystem: true
           env:
             - name: ZITADEL_ISSUER
               value: "{{ include "stackweaver.zitadel.issuer" . }}/ui/v2/login"
@@ -233,6 +241,8 @@ spec:
             - name: pat
               mountPath: /pat
               readOnly: true
+            - name: tmp
+              mountPath: /tmp
           {{- with .Values.zitadel.init.resources }}
           resources:
             {{- toYaml . | nindent 12 }}
@@ -242,5 +252,7 @@ spec:
           configMap:
             name: {{ include "stackweaver.fullname" . }}-zitadel-config
         - name: pat
+          emptyDir: {}
+        - name: tmp
           emptyDir: {}
 {{- end }}

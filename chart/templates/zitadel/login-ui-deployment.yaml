@@ -25,6 +25,8 @@ spec:
       initContainers:
         - name: wait-for-zitadel
           image: busybox:1.36
+          securityContext:
+            readOnlyRootFilesystem: true
           resources:
             requests:
               cpu: 10m
@@ -44,6 +46,8 @@ spec:
       containers:
         - name: login-ui
           image: "{{ .Values.zitadel.loginUI.image.repository }}:{{ .Values.zitadel.loginUI.image.tag }}"
+          securityContext:
+            readOnlyRootFilesystem: true
           ports:
             - name: http
               containerPort: 3000
@@ -80,6 +84,16 @@ spec:
             initialDelaySeconds: 5
             periodSeconds: 10
             timeoutSeconds: 5
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: nextjs-cache
+              mountPath: /app/.next
           resources:
             {{- toYaml .Values.zitadel.loginUI.resources | nindent 12 }}
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: nextjs-cache
+          emptyDir: {}
 {{- end }}
