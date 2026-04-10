@@ -147,24 +147,46 @@ Redis port
 {{- end }}
 
 {{/*
-MinIO endpoint (host:port) — internal K8s DNS when bundled.
+Storage endpoint — auto-resolve for bundled Garage, use values for external.
 */}}
-{{- define "stackweaver.minio.endpoint" -}}
-{{- if .Values.minio.enabled }}
-{{- printf "%s-minio:9000" (include "stackweaver.fullname" .) }}
+{{- define "stackweaver.storage.endpoint" -}}
+{{- if .Values.garage.enabled }}
+{{- printf "%s-garage:3900" (include "stackweaver.fullname" .) }}
 {{- else }}
-{{- required "minio.external.endpoint is required when minio.enabled=false" .Values.minio.external.endpoint }}
+{{- required "storage.endpoint is required when garage.enabled=false" .Values.storage.endpoint }}
 {{- end }}
 {{- end }}
 
 {{/*
-MinIO use SSL
+Storage useSSL — false for bundled Garage, configurable for external.
 */}}
-{{- define "stackweaver.minio.useSSL" -}}
-{{- if .Values.minio.enabled }}
+{{- define "stackweaver.storage.useSSL" -}}
+{{- if .Values.garage.enabled }}
 {{- false }}
 {{- else }}
-{{- .Values.minio.external.useSSL | default false }}
+{{- .Values.storage.useSSL | default false }}
+{{- end }}
+{{- end }}
+
+{{/*
+Storage forcePathStyle — true for bundled Garage, configurable for external.
+*/}}
+{{- define "stackweaver.storage.forcePathStyle" -}}
+{{- if .Values.garage.enabled }}
+{{- true }}
+{{- else }}
+{{- .Values.storage.forcePathStyle | default false }}
+{{- end }}
+{{- end }}
+
+{{/*
+Storage region — "garage" for bundled, configurable for external.
+*/}}
+{{- define "stackweaver.storage.region" -}}
+{{- if .Values.garage.enabled }}
+{{- "garage" }}
+{{- else }}
+{{- .Values.storage.region | default "us-east-1" }}
 {{- end }}
 {{- end }}
 
@@ -180,8 +202,8 @@ MinIO use SSL
 {{- .Values.secrets.redis.secretName | default "" }}
 {{- end }}
 
-{{- define "stackweaver.secrets.minio" -}}
-{{- .Values.secrets.minio.secretName | default (printf "%s-minio" (include "stackweaver.fullname" .)) }}
+{{- define "stackweaver.secrets.storage" -}}
+{{- .Values.secrets.storage.secretName | default (printf "%s-storage" (include "stackweaver.fullname" .)) }}
 {{- end }}
 
 {{- define "stackweaver.secrets.encryption" -}}
@@ -219,7 +241,9 @@ Zitadel internal address (for in-cluster gRPC/HTTP calls between services).
 Zitadel external issuer URL (browser-reachable, used for OIDC iss claim validation).
 */}}
 {{- define "stackweaver.zitadel.issuer" -}}
-{{- if .Values.zitadel.bundled }}
+{{- if (index .Values.frontend.env "VITE_ZITADEL_ISSUER") }}
+{{- index .Values.frontend.env "VITE_ZITADEL_ISSUER" }}
+{{- else if .Values.zitadel.bundled }}
 {{- $scheme := ternary "https" "http" .Values.ingress.tls.enabled }}
 {{- printf "%s://%s" $scheme .Values.ingress.hosts.auth }}
 {{- else }}
@@ -229,18 +253,47 @@ Zitadel external issuer URL (browser-reachable, used for OIDC iss claim validati
 
 {{/*
 Login UI external base URL (browser-reachable).
+With an ingress, the login UI shares Zitadel's domain (path-based routing).
+Without an ingress (e.g. kind), set zitadel.config.loginUIBaseURL to the
+browser-reachable URL of the login-ui container (e.g. http://localhost:3000/ui/v2/login).
 */}}
 {{- define "stackweaver.loginUI.baseURL" -}}
+{{- if .Values.zitadel.config.loginUIBaseURL }}
+{{- .Values.zitadel.config.loginUIBaseURL }}
+{{- else if .Values.zitadel.config.ExternalDomain }}
+{{- $scheme := ternary "https" "http" (hasKey .Values.zitadel.config "ExternalSecure" | ternary .Values.zitadel.config.ExternalSecure .Values.ingress.tls.enabled) }}
+{{- $port := .Values.zitadel.config.ExternalPort | default (ternary 443 80 .Values.ingress.tls.enabled) }}
+{{- if or (and (eq $scheme "https") (eq (int $port) 443)) (and (eq $scheme "http") (eq (int $port) 80)) }}
+{{- printf "%s://%s/ui/v2/login" $scheme .Values.zitadel.config.ExternalDomain }}
+{{- else }}
+{{- printf "%s://%s:%v/ui/v2/login" $scheme .Values.zitadel.config.ExternalDomain $port }}
+{{- end }}
+{{- else }}
 {{- $scheme := ternary "https" "http" .Values.ingress.tls.enabled }}
 {{- printf "%s://%s/ui/v2/login" $scheme .Values.ingress.hosts.auth }}
+{{- end }}
 {{- end }}
 
 {{/*
 Login UI external origin.
+Derives from loginUIBaseURL if set, otherwise from ExternalDomain or ingress host.
 */}}
 {{- define "stackweaver.loginUI.origin" -}}
+{{- if .Values.zitadel.config.loginUIBaseURL }}
+{{- /* Extract origin (scheme://host:port) from the full BaseURL */ -}}
+{{- .Values.zitadel.config.loginUIBaseURL | trimSuffix "/ui/v2/login" }}
+{{- else if .Values.zitadel.config.ExternalDomain }}
+{{- $scheme := ternary "https" "http" (hasKey .Values.zitadel.config "ExternalSecure" | ternary .Values.zitadel.config.ExternalSecure .Values.ingress.tls.enabled) }}
+{{- $port := .Values.zitadel.config.ExternalPort | default (ternary 443 80 .Values.ingress.tls.enabled) }}
+{{- if or (and (eq $scheme "https") (eq (int $port) 443)) (and (eq $scheme "http") (eq (int $port) 80)) }}
+{{- printf "%s://%s" $scheme .Values.zitadel.config.ExternalDomain }}
+{{- else }}
+{{- printf "%s://%s:%v" $scheme .Values.zitadel.config.ExternalDomain $port }}
+{{- end }}
+{{- else }}
 {{- $scheme := ternary "https" "http" .Values.ingress.tls.enabled }}
 {{- printf "%s://%s" $scheme .Values.ingress.hosts.auth }}
+{{- end }}
 {{- end }}
 
 {{/*
@@ -255,14 +308,22 @@ App external URL (frontend).
 API external URL.
 */}}
 {{- define "stackweaver.api.url" -}}
+{{- if (index .Values.frontend.env "VITE_API_URL") }}
+{{- index .Values.frontend.env "VITE_API_URL" }}
+{{- else }}
 {{- printf "%s/api/v2" (include "stackweaver.app.url" .) }}
+{{- end }}
 {{- end }}
 
 {{/*
 Frontend OIDC redirect URI.
 */}}
 {{- define "stackweaver.frontend.redirectURI" -}}
+{{- if (index .Values.frontend.env "VITE_ZITADEL_REDIRECT_URI") }}
+{{- index .Values.frontend.env "VITE_ZITADEL_REDIRECT_URI" }}
+{{- else }}
 {{- printf "%s/auth/callback" (include "stackweaver.app.url" .) }}
+{{- end }}
 {{- end }}
 
 {{/* ── Ingress annotation helpers ─────────────────────────────────────── */}}
@@ -357,23 +418,35 @@ Redis env vars — shared between api, orchestrator, runner, ansible-runner.
 {{- end }}
 
 {{/*
-Storage (MinIO/S3) env vars — for runner and ansible-runner.
+Storage env vars — injected into api, runner, ansible-runner, orchestrator.
+Single block, works for both bundled Garage and any external S3 service.
+When storage.auth=pod-identity, credential env vars are omitted.
 */}}
 {{- define "stackweaver.env.storage" -}}
+- name: STORAGE_BACKEND
+  value: "s3"
 - name: STORAGE_ENDPOINT
-  value: {{ include "stackweaver.minio.endpoint" . | quote }}
+  value: {{ include "stackweaver.storage.endpoint" . | quote }}
+{{- if eq (.Values.storage.auth | default "credentials") "credentials" }}
 - name: STORAGE_ACCESS_KEY
   valueFrom:
     secretKeyRef:
-      name: {{ include "stackweaver.secrets.minio" . }}
-      key: {{ .Values.secrets.minio.keys.accessKey }}
+      name: {{ include "stackweaver.secrets.storage" . }}
+      key: {{ .Values.secrets.storage.keys.accessKey }}
 - name: STORAGE_SECRET_KEY
   valueFrom:
     secretKeyRef:
-      name: {{ include "stackweaver.secrets.minio" . }}
-      key: {{ .Values.secrets.minio.keys.secretKey }}
+      name: {{ include "stackweaver.secrets.storage" . }}
+      key: {{ .Values.secrets.storage.keys.secretKey }}
+{{- end }}
 - name: STORAGE_USE_SSL
-  value: {{ include "stackweaver.minio.useSSL" . | quote }}
+  value: {{ include "stackweaver.storage.useSSL" . | quote }}
+- name: STORAGE_BUCKET
+  value: {{ .Values.storage.bucket | quote }}
+- name: STORAGE_REGION
+  value: {{ include "stackweaver.storage.region" . | quote }}
+- name: STORAGE_FORCE_PATH_STYLE
+  value: {{ include "stackweaver.storage.forcePathStyle" . | quote }}
 {{- end }}
 
 {{/*

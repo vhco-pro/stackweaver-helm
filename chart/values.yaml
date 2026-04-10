@@ -73,9 +73,11 @@ secrets:
     secretName: ""
     keys:
       password: password
-  # MinIO / S3 credentials
-  # Auto-generates access-key ("minioadmin") + random secret-key when empty.
-  minio:
+  # Storage / S3 credentials (only used when storage.auth=credentials)
+  # When garage.enabled=true AND secretName is empty, auto-generates credentials
+  # that match the bundled Garage init. When using external S3, provide your own secret.
+  # Ignored entirely when storage.auth=pod-identity.
+  storage:
     secretName: ""
     keys:
       accessKey: access-key
@@ -229,15 +231,21 @@ ansibleRunner:
   tolerations: []
   affinity: {}
 # ── Storage ───────────────────────────────────────────────────────────────────
+# All data (state, configs, registry, logs, ansible artifacts) is stored in a
+# single S3-compatible bucket. Any S3-compatible service works: AWS S3, R2, B2,
+# MinIO, Garage, DigitalOcean Spaces, etc.
+# When garage.enabled=true (default), the chart deploys a bundled Garage instance
+# and auto-configures storage to point to it. Set garage.enabled=false to use an
+# external S3-compatible service.
 storage:
-  # "minio" or "s3"
-  provider: minio
-  stateBucket: iac-state
-  registryBucket: terraform-registry
-  ansibleBucket: ansible-artifacts
-  s3:
-    region: us-east-1
-    endpoint: ""
+  bucket: stackweaver
+  region: garage
+  endpoint: ""
+  useSSL: false
+  forcePathStyle: true
+  # Authentication: "credentials" (default) or "pod-identity" (IRSA/Workload Identity)
+  auth: credentials
+  serviceAccountAnnotations: {}
 # ── Runner Workspaces PVC ─────────────────────────────────────────────────────
 runnerWorkspaces:
   size: 10Gi
@@ -293,17 +301,19 @@ redis:
   external:
     host: ""
     port: 6379
-# -- MinIO --
-minio:
+# -- Garage (bundled S3-compatible storage) --
+# Lightweight, self-hosted, S3-compatible object store. Deployed by default.
+# Set enabled=false when using AWS S3, Cloudflare R2, or another external service.
+garage:
   enabled: true
   image:
-    repository: minio/minio
-    tag: latest
+    repository: dxflrs/garage
+    tag: v2.2.0
   storage:
     size: 10Gi
     storageClass: ""
-    existingClaim: ""  # if set, skip volumeClaimTemplate and use this pre-existing PVC
-    volumeName: ""     # if set, bind the new PVC to this specific pre-existing PV
+    existingClaim: ""
+    volumeName: ""
   resources:
     requests:
       cpu: 100m
@@ -311,10 +321,6 @@ minio:
     limits:
       cpu: 500m
       memory: 512Mi
-  consolePort: 9001
-  external:
-    endpoint: ""
-    useSSL: false
 # -- Zitadel (OIDC Identity Provider) --
 # Zitadel is REQUIRED — the stack cannot function without it.
 # Set bundled=true to deploy Zitadel in this chart, or bundled=false to use

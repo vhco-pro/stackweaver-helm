@@ -60,7 +60,7 @@ spec:
             - --masterkey
             - $(ZITADEL_MASTERKEY)
             - --tlsMode
-            - external
+            - {{ .Values.zitadel.config.tlsMode | default "external" }}
           ports:
             - name: http
               containerPort: 8080
@@ -138,7 +138,7 @@ spec:
             # ZITADEL_DOMAIN must match Zitadel's ExternalDomain so the gRPC
             # :authority header resolves to the correct instance.
             - name: ZITADEL_DOMAIN
-              value: {{ .Values.ingress.hosts.auth | quote }}
+              value: {{ .Values.zitadel.config.ExternalDomain | default .Values.ingress.hosts.auth | quote }}
             - name: PROJECT_ROOT
               value: /config
             - name: ZITADEL_ADMIN_USERNAME

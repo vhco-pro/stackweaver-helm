@@ -68,7 +68,7 @@ spec:
             # x-zitadel-instance-host: tells Zitadel which instance to serve (by ExternalDomain).
             # Docker Compose: network_mode: host means probes use localhost (trusted); no override needed.
             - name: CUSTOM_REQUEST_HEADERS
-              value: "x-zitadel-instance-host:{{ .Values.ingress.hosts.auth }}"
+              value: "x-zitadel-instance-host:{{ .Values.zitadel.config.ExternalDomain | default .Values.ingress.hosts.auth }}"
           # TCP socket probes: just verify the Next.js server is listening.
           # httpGet probes on /ui/v2/login trigger SSR which calls Zitadel via gRPC;
           # if Zitadel is slow the SSR hangs and the probe times out.
