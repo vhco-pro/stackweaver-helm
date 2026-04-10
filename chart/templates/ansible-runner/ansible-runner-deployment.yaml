@@ -41,8 +41,6 @@ spec:
             {{- include "stackweaver.env.redis" . | nindent 12 }}
             # ── Storage ──
             {{- include "stackweaver.env.storage" . | nindent 12 }}
-            - name: STORAGE_BUCKET
-              value: {{ .Values.storage.ansibleBucket | quote }}
             # ── Encryption ──
             {{- include "stackweaver.env.encryption" . | nindent 12 }}
             # ── Workspaces ──

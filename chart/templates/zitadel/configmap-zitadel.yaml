@@ -8,9 +8,9 @@ metadata:
     app.kubernetes.io/component: zitadel
 data:
   defaults.yaml: |
-    ExternalDomain: {{ .Values.ingress.hosts.auth }}
-    ExternalPort: {{ ternary 443 80 .Values.ingress.tls.enabled }}
-    ExternalSecure: {{ .Values.ingress.tls.enabled }}
+    ExternalDomain: {{ if .Values.zitadel.config.ExternalDomain }}{{ .Values.zitadel.config.ExternalDomain }}{{ else }}{{ .Values.ingress.hosts.auth }}{{ end }}
+    ExternalPort: {{ if .Values.zitadel.config.ExternalPort }}{{ .Values.zitadel.config.ExternalPort }}{{ else }}{{ ternary 443 80 .Values.ingress.tls.enabled }}{{ end }}
+    ExternalSecure: {{ if hasKey .Values.zitadel.config "ExternalSecure" }}{{ .Values.zitadel.config.ExternalSecure }}{{ else }}{{ .Values.ingress.tls.enabled }}{{ end }}
     TLS:
       Enabled: false
 

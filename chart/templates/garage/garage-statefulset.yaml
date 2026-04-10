@@ -1,0 +1,197 @@
+{{- if .Values.garage.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "stackweaver.fullname" . }}-garage
+  labels:
+    {{- include "stackweaver.labels" . | nindent 4 }}
+    app.kubernetes.io/component: garage
+spec:
+  serviceName: {{ include "stackweaver.fullname" . }}-garage
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "stackweaver.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: garage
+  template:
+    metadata:
+      labels:
+        {{- include "stackweaver.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: garage
+    spec:
+      {{- include "stackweaver.imagePullSecrets" . | nindent 6 }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+        - name: garage
+          image: "{{ .Values.garage.image.repository }}:{{ .Values.garage.image.tag }}"
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+          ports:
+            - name: s3
+              containerPort: 3900
+            - name: rpc
+              containerPort: 3901
+            - name: admin
+              containerPort: 3903
+          env:
+            - name: GARAGE_RPC_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "stackweaver.fullname" . }}-garage
+                  key: rpc-secret
+            - name: GARAGE_ADMIN_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "stackweaver.fullname" . }}-garage
+                  key: admin-token
+            - name: GARAGE_METRICS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "stackweaver.fullname" . }}-garage
+                  key: metrics-token
+          livenessProbe:
+            tcpSocket:
+              port: 3900
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            tcpSocket:
+              port: 3900
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.garage.resources | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/garage/data
+            - name: meta
+              mountPath: /var/lib/garage/meta
+            - name: config
+              mountPath: /etc/garage.toml
+              subPath: garage.toml
+        - name: garage-init
+          image: alpine:3.23
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -e
+              # Download Garage CLI to writable tmpdir
+              ARCH=$$(uname -m)
+              echo "Downloading Garage CLI for $${ARCH}..."
+              wget -qO /tmp/garage \
+                "https://garagehq.deuxfleurs.fr/_releases/{{ .Values.garage.image.tag }}/$${ARCH}-unknown-linux-musl/garage"
+              chmod +x /tmp/garage
+              export PATH="/tmp:$PATH"
+
+              # Wait for Garage RPC to be reachable
+              echo "Waiting for Garage..."
+              until garage status 2>/dev/null | grep -qi "Hostname"; do sleep 2; done
+              echo "Garage is ready"
+
+              # Get node ID
+              NODE_ID=$$(garage status 2>/dev/null | grep -v "^=\|^ID" | head -1 | awk '{print $$1}')
+              echo "Node ID: $${NODE_ID}"
+
+              # Assign layout if not yet configured
+              CURRENT_VER=$$(garage layout show 2>/dev/null \
+                | grep "Current cluster layout version:" | awk '{print $$NF}' || echo "0")
+              if [ "$${CURRENT_VER}" = "0" ]; then
+                echo "Configuring cluster layout..."
+                garage layout assign -z dc1 -c 1G "$${NODE_ID}"
+                garage layout apply --version 1
+              else
+                echo "Layout already configured (version $${CURRENT_VER})"
+              fi
+
+              # Import key, create bucket, grant access (all idempotent)
+              echo "Importing access key..."
+              garage key import --yes -n stackweaver \
+                "$${STORAGE_ACCESS_KEY}" "$${STORAGE_SECRET_KEY}" 2>/dev/null || true
+              echo "Creating bucket..."
+              garage bucket create {{ .Values.storage.bucket }} 2>/dev/null || true
+              echo "Granting key access..."
+              garage bucket allow --read --write --owner \
+                {{ .Values.storage.bucket }} --key "$${STORAGE_ACCESS_KEY}" 2>/dev/null || true
+
+              echo "Garage initialized successfully"
+              # Sleep forever — sidecar must stay alive or the pod enters CrashLoopBackOff.
+              # Uses zero CPU (interruptible sleep). Same pattern as zitadel-init sidecar.
+              exec sleep infinity
+          env:
+            - name: GARAGE_RPC_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "stackweaver.fullname" . }}-garage
+                  key: rpc-secret
+            - name: STORAGE_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "stackweaver.secrets.storage" . }}
+                  key: {{ .Values.secrets.storage.keys.accessKey }}
+            - name: STORAGE_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "stackweaver.secrets.storage" . }}
+                  key: {{ .Values.secrets.storage.keys.secretKey }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/garage.toml
+              subPath: garage.toml
+            - name: meta
+              mountPath: /var/lib/garage/meta
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "stackweaver.fullname" . }}-garage
+        - name: tmp
+          emptyDir: {}
+  {{- if .Values.garage.storage.existingClaim }}
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ .Values.garage.storage.existingClaim }}
+        - name: meta
+          emptyDir: {}
+  {{- else }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        {{- if .Values.garage.storage.storageClass }}
+        storageClassName: {{ .Values.garage.storage.storageClass | quote }}
+        {{- end }}
+        {{- if .Values.garage.storage.volumeName }}
+        volumeName: {{ .Values.garage.storage.volumeName | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.garage.storage.size }}
+    - metadata:
+        name: meta
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        {{- if .Values.garage.storage.storageClass }}
+        storageClassName: {{ .Values.garage.storage.storageClass | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: 1Gi
+  {{- end }}
+{{- end }}

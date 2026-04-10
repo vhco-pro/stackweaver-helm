@@ -103,6 +103,8 @@ spec:
               readOnly: true
             - name: nginx-cache
               mountPath: /var/cache/nginx
+            - name: nginx-lib
+              mountPath: /var/lib/nginx/tmp
             - name: nginx-run
               mountPath: /var/run
             - name: tmp
@@ -137,6 +139,8 @@ spec:
         - name: config-out
           emptyDir: {}
         - name: nginx-cache
+          emptyDir: {}
+        - name: nginx-lib
           emptyDir: {}
         - name: nginx-run
           emptyDir: {}
