@@ -25,7 +25,6 @@ rules:
     resourceNames:
       - "{{ include "stackweaver.fullname" . }}-api"
       - "{{ include "stackweaver.fullname" . }}-frontend"
-      - "{{ include "stackweaver.fullname" . }}-login-ui"
     verbs: ["get", "patch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1

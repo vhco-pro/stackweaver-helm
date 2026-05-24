@@ -70,7 +70,7 @@ imagePullSecrets:
 {{/* ── Dependency host/port helpers ──────────────────────────────────────── */}}
 
 {{/*
-PostgreSQL host — internal K8s DNS when bundled.
+PostgreSQL host, internal K8s DNS when bundled.
 */}}
 {{- define "stackweaver.postgresql.host" -}}
 {{- if .Values.postgresql.enabled }}
@@ -147,7 +147,7 @@ Redis port
 {{- end }}
 
 {{/*
-Storage endpoint — auto-resolve for bundled Garage, use values for external.
+Storage endpoint, auto-resolve for bundled Garage, use values for external.
 */}}
 {{- define "stackweaver.storage.endpoint" -}}
 {{- if .Values.garage.enabled }}
@@ -158,7 +158,7 @@ Storage endpoint — auto-resolve for bundled Garage, use values for external.
 {{- end }}
 
 {{/*
-Storage useSSL — false for bundled Garage, configurable for external.
+Storage useSSL, false for bundled Garage, configurable for external.
 */}}
 {{- define "stackweaver.storage.useSSL" -}}
 {{- if .Values.garage.enabled }}
@@ -169,7 +169,7 @@ Storage useSSL — false for bundled Garage, configurable for external.
 {{- end }}
 
 {{/*
-Storage forcePathStyle — true for bundled Garage, configurable for external.
+Storage forcePathStyle, true for bundled Garage, configurable for external.
 */}}
 {{- define "stackweaver.storage.forcePathStyle" -}}
 {{- if .Values.garage.enabled }}
@@ -180,7 +180,7 @@ Storage forcePathStyle — true for bundled Garage, configurable for external.
 {{- end }}
 
 {{/*
-Storage region — "garage" for bundled, configurable for external.
+Storage region, "garage" for bundled, configurable for external.
 */}}
 {{- define "stackweaver.storage.region" -}}
 {{- if .Values.garage.enabled }}
@@ -253,46 +253,27 @@ Zitadel external issuer URL (browser-reachable, used for OIDC iss claim validati
 
 {{/*
 Login UI external base URL (browser-reachable).
-With an ingress, the login UI shares Zitadel's domain (path-based routing).
-Without an ingress (e.g. kind), set zitadel.config.loginUIBaseURL to the
-browser-reachable URL of the login-ui container (e.g. http://localhost:3000/ui/v2/login).
+Points at the Stackweaver SPA's /login routes, the custom login UI that replaced
+the standalone zitadel-login container. Override via zitadel.config.loginUIBaseURL
+if the SPA is served from a non-default location.
 */}}
 {{- define "stackweaver.loginUI.baseURL" -}}
 {{- if .Values.zitadel.config.loginUIBaseURL }}
 {{- .Values.zitadel.config.loginUIBaseURL }}
-{{- else if .Values.zitadel.config.ExternalDomain }}
-{{- $scheme := ternary "https" "http" (hasKey .Values.zitadel.config "ExternalSecure" | ternary .Values.zitadel.config.ExternalSecure .Values.ingress.tls.enabled) }}
-{{- $port := .Values.zitadel.config.ExternalPort | default (ternary 443 80 .Values.ingress.tls.enabled) }}
-{{- if or (and (eq $scheme "https") (eq (int $port) 443)) (and (eq $scheme "http") (eq (int $port) 80)) }}
-{{- printf "%s://%s/ui/v2/login" $scheme .Values.zitadel.config.ExternalDomain }}
 {{- else }}
-{{- printf "%s://%s:%v/ui/v2/login" $scheme .Values.zitadel.config.ExternalDomain $port }}
-{{- end }}
-{{- else }}
-{{- $scheme := ternary "https" "http" .Values.ingress.tls.enabled }}
-{{- printf "%s://%s/ui/v2/login" $scheme .Values.ingress.hosts.auth }}
+{{- printf "%s/login" (include "stackweaver.app.url" .) }}
 {{- end }}
 {{- end }}
 
 {{/*
-Login UI external origin.
-Derives from loginUIBaseURL if set, otherwise from ExternalDomain or ingress host.
+Login UI external origin (scheme://host[:port], no path).
+Used for CORS-adjacent configuration that expects an origin, not a full URL.
 */}}
 {{- define "stackweaver.loginUI.origin" -}}
 {{- if .Values.zitadel.config.loginUIBaseURL }}
-{{- /* Extract origin (scheme://host:port) from the full BaseURL */ -}}
-{{- .Values.zitadel.config.loginUIBaseURL | trimSuffix "/ui/v2/login" }}
-{{- else if .Values.zitadel.config.ExternalDomain }}
-{{- $scheme := ternary "https" "http" (hasKey .Values.zitadel.config "ExternalSecure" | ternary .Values.zitadel.config.ExternalSecure .Values.ingress.tls.enabled) }}
-{{- $port := .Values.zitadel.config.ExternalPort | default (ternary 443 80 .Values.ingress.tls.enabled) }}
-{{- if or (and (eq $scheme "https") (eq (int $port) 443)) (and (eq $scheme "http") (eq (int $port) 80)) }}
-{{- printf "%s://%s" $scheme .Values.zitadel.config.ExternalDomain }}
+{{- .Values.zitadel.config.loginUIBaseURL | trimSuffix "/login" }}
 {{- else }}
-{{- printf "%s://%s:%v" $scheme .Values.zitadel.config.ExternalDomain $port }}
-{{- end }}
-{{- else }}
-{{- $scheme := ternary "https" "http" .Values.ingress.tls.enabled }}
-{{- printf "%s://%s" $scheme .Values.ingress.hosts.auth }}
+{{- include "stackweaver.app.url" . }}
 {{- end }}
 {{- end }}
 
@@ -329,7 +310,7 @@ Frontend OIDC redirect URI.
 {{/* ── Ingress annotation helpers ─────────────────────────────────────── */}}
 
 {{/*
-App ingress annotations — provider presets + global + per-ingress overrides.
+App ingress annotations, provider presets + global + per-ingress overrides.
 Usage: {{- include "stackweaver.ingress.appAnnotations" . | nindent 4 }}
 */}}
 {{- define "stackweaver.ingress.appAnnotations" -}}
@@ -355,7 +336,7 @@ nginx.org/proxy-send-timeout: "3600s"
 {{- end }}
 
 {{/*
-Auth ingress annotations — provider presets + global + per-ingress overrides.
+Auth ingress annotations, provider presets + global + per-ingress overrides.
 Usage: {{- include "stackweaver.ingress.authAnnotations" . | nindent 4 }}
 */}}
 {{- define "stackweaver.ingress.authAnnotations" -}}
@@ -380,7 +361,7 @@ nginx.org/client-max-body-size: "10m"
 {{/* ── Common env-var snippets (reused across deployments) ────────────── */}}
 
 {{/*
-Database env vars — shared between api, orchestrator, runner, ansible-runner.
+Database env vars, shared between api, orchestrator, runner, ansible-runner.
 */}}
 {{- define "stackweaver.env.database" -}}
 - name: DATABASE_HOST
@@ -401,7 +382,7 @@ Database env vars — shared between api, orchestrator, runner, ansible-runner.
 {{- end }}
 
 {{/*
-Redis env vars — shared between api, orchestrator, runner, ansible-runner.
+Redis env vars, shared between api, orchestrator, runner, ansible-runner.
 */}}
 {{- define "stackweaver.env.redis" -}}
 - name: REDIS_HOST
@@ -418,7 +399,7 @@ Redis env vars — shared between api, orchestrator, runner, ansible-runner.
 {{- end }}
 
 {{/*
-Storage env vars — injected into api, runner, ansible-runner, orchestrator.
+Storage env vars, injected into api, runner, ansible-runner, orchestrator.
 Single block, works for both bundled Garage and any external S3 service.
 When storage.auth=pod-identity, credential env vars are omitted.
 */}}
@@ -450,7 +431,7 @@ When storage.auth=pod-identity, credential env vars are omitted.
 {{- end }}
 
 {{/*
-Encryption key env var — shared between api, runner, ansible-runner.
+Encryption key env var, shared between api, runner, ansible-runner.
 */}}
 {{- define "stackweaver.env.encryption" -}}
 - name: ENCRYPTION_KEY
@@ -471,7 +452,7 @@ Use as a truthy check: {{- if include "stackweaver.customCA.enabled" . }}
 {{- end }}
 
 {{/*
-Volume definition for the custom CA — emits nothing when disabled.
+Volume definition for the custom CA, emits nothing when disabled.
 Include with nindent inside a volumes: list.
 */}}
 {{- define "stackweaver.customCA.volume" -}}
@@ -491,7 +472,7 @@ Include with nindent inside a volumes: list.
 {{- end }}
 
 {{/*
-VolumeMount for the custom CA — emits nothing when disabled.
+VolumeMount for the custom CA, emits nothing when disabled.
 Mounted at /etc/ssl/certs/custom-ca.crt via subPath so the system cert
 directory is not replaced. Go's crypto/x509 scans /etc/ssl/certs/ on Linux.
 Include with nindent inside a volumeMounts: list.

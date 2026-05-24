@@ -80,12 +80,18 @@ spec:
               value: {{ include "stackweaver.zitadel.issuer" . | quote }}
             - name: ZITADEL_INTERNAL_ADDR
               value: {{ include "stackweaver.zitadel.internalAddr" . | quote }}
+            # Round 25 hardening (item 15): NOT optional. Required for
+            # backchannel-logout audience binding (OIDC §2.6 step 4 /
+            # Round 23 Finding 1), when missing, any Zitadel-signed
+            # logout_token from any other RP on the same instance can
+            # terminate sessions in this app. The api will refuse to
+            # construct the backchannel verifier in production when
+            # this value is empty (panic on first use).
             - name: ZITADEL_API_CLIENT_ID
               valueFrom:
                 secretKeyRef:
                   name: {{ include "stackweaver.secrets.zitadel" . }}
                   key: {{ .Values.secrets.zitadel.keys.clientId }}
-                  optional: true
             - name: ZITADEL_API_CLIENT_SECRET
               valueFrom:
                 secretKeyRef:
@@ -98,6 +104,17 @@ spec:
                   name: {{ include "stackweaver.secrets.zitadel" . }}
                   key: {{ .Values.secrets.zitadel.keys.loginServiceUserToken }}
                   optional: true
+            # ── Auth proxy config (custom login UI, replaces zitadel-login container) ──
+            - name: STACKWEAVER_NOTIFICATION_MODE
+              value: {{ .Values.api.auth.notificationMode | default "return_code" | quote }}
+            - name: STACKWEAVER_DEFAULT_REDIRECT_URI
+              value: {{ include "stackweaver.frontend.redirectURI" . | quote }}
+            - name: STACKWEAVER_AUTO_SUBMIT_CODE
+              value: {{ .Values.api.auth.autoSubmitCode | default false | quote }}
+            # Forward the external host so Zitadel builds IdP callback URLs against
+            # the browser-reachable domain instead of the internal service name.
+            - name: CUSTOM_REQUEST_HEADERS
+              value: "x-zitadel-instance-host:{{ .Values.zitadel.config.ExternalDomain | default .Values.ingress.hosts.auth }}"
             - name: ZITADEL_WEBHOOK_IDP_SYNC_KEY
               valueFrom:
                 secretKeyRef:
@@ -114,7 +131,9 @@ spec:
             {{- include "stackweaver.env.encryption" . | nindent 12 }}
             # ── Storage ──
             {{- include "stackweaver.env.storage" . | nindent 12 }}
-            # ── App URL (used by GitHub Setup URL relay and status check links) ──
+            # ── App URL (SPA's public origin, used by the auth proxy to build IdP
+            #    success/failure URLs that land on the SPA, by GitHub Setup URL
+            #    relay, and by status check links) ──
             - name: STACKWEAVER_APP_URL
               value: {{ include "stackweaver.app.url" . | quote }}
             # ── GitHub App ──

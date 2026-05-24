@@ -7,7 +7,6 @@ Application URL:  {{ include "stackweaver.app.url" . }}
 API URL:          {{ include "stackweaver.api.url" . }}
 {{- if .Values.zitadel.bundled }}
 Auth (Zitadel):   {{ include "stackweaver.zitadel.issuer" . }}
-Login UI:         {{ include "stackweaver.loginUI.baseURL" . }}
 {{- end }}
 {{- else }}
 Access the application by port-forwarding:
@@ -38,7 +37,7 @@ The zitadel-init Job will run automatically and:
   2. Create service users and PATs
   3. Configure webhooks and IdP sync
   4. Write all credentials directly into the Zitadel secret
-  5. Trigger rolling restarts of the API, frontend, and login-ui
+  5. Trigger rolling restarts of the API and frontend
 
 No manual steps are required. To monitor progress:
   kubectl logs -f job/{{ include "stackweaver.fullname" . }}-zitadel-init

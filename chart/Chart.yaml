@@ -1,7 +1,7 @@
 apiVersion: v2
 name: stackweaver
 description: >-
-  StackWeaver — Open-source DevOps platform for multi-IaC orchestration
+  StackWeaver, Open-source DevOps platform for multi-IaC orchestration
   (Ansible, OpenTofu). Includes optional bundled dependencies
   (PostgreSQL, Redis, MinIO, Zitadel) or bring-your-own.
 

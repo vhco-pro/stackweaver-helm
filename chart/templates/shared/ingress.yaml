@@ -32,6 +32,15 @@ spec:
                 name: {{ include "stackweaver.fullname" . }}-api
                 port:
                   number: {{ .Values.api.port }}
+          # Auth proxy (OIDC + Session API) for the custom login UI —
+          # routes under /auth/* live on the API, not under /api/v2/*.
+          - path: /auth
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "stackweaver.fullname" . }}-api
+                port:
+                  number: {{ .Values.api.port }}
           # Terraform service discovery
           - path: /.well-known/terraform.json
             pathType: Exact
@@ -90,15 +99,9 @@ spec:
     - host: {{ .Values.ingress.hosts.auth | quote }}
       http:
         paths:
-          # Login UI (Next.js app at /ui/v2/login)
-          - path: /ui/v2/login
-            pathType: Prefix
-            backend:
-              service:
-                name: {{ include "stackweaver.fullname" . }}-login-ui
-                port:
-                  number: 3000
-          # Zitadel catch-all (OIDC, API, admin, etc.)
+          # Zitadel catch-all (OIDC, API, admin, etc.). The login UI that used to
+          # mount at /ui/v2/login was removed in favor of the Stackweaver SPA's
+          # /login routes on the app host, see custom-login-ui-plan.md.
           - path: /
             pathType: Prefix
             backend:
