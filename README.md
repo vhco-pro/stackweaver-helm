@@ -21,6 +21,7 @@ helm install stackweaver oci://ghcr.io/vhco-pro/charts/stackweaver \
 
 See [values.yaml](chart/values.yaml) for all available configuration options.
 
+
 ## Verifying this Distribution
 
 Chart versions **0.6.8 and later** are Sigstore-signed (keyless) and ship with an SPDX SBOM attestation. To verify a chart before installing:
