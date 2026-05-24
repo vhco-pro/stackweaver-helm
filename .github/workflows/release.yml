@@ -3,51 +3,116 @@
 name: Release Helm Chart
 
 on:
-  workflow_dispatch: 
+  workflow_dispatch:
   push:
     tags:
       - '*.*.*'
 
-permissions:
-  contents: write
-  packages: write
+permissions: {}
 
 jobs:
   release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write       # README bump + GitHub Release
+      packages: write       # GHCR push
+      id-token: write       # Sigstore OIDC for cosign keyless
+      attestations: write   # actions/attest-* (only effective when public)
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
 
       - name: Install Helm
-        uses: azure/setup-helm@v4
+        uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4.3.1
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@d7543c93d881b35a8faa02e8e3605f69b7a1ce62 # v4.1.2
+
+      - name: Install syft
+        uses: anchore/sbom-action/download-syft@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
 
       - name: Login to GHCR
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u vhco-pro --password-stdin
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "$GH_TOKEN" | helm registry login ghcr.io -u vhco-pro --password-stdin
 
       - name: Package chart
+        env:
+          VERSION: ${{ github.ref_name }}
         run: |
-          # Set chart version from git tag
-          sed -i "s/^version:.*/version: ${{ github.ref_name }}/" chart/Chart.yaml
-          sed -i "s/^appVersion:.*/appVersion: \"${{ github.ref_name }}\"/" chart/Chart.yaml
+          # Set chart version + appVersion from git tag
+          sed -i "s/^version:.*/version: ${VERSION}/" chart/Chart.yaml
+          sed -i "s/^appVersion:.*/appVersion: \"${VERSION}\"/" chart/Chart.yaml
           helm package chart/
 
-      - name: Push to GHCR
-        run: helm push stackweaver-${{ github.ref_name }}.tgz oci://ghcr.io/vhco-pro/charts
+      - name: Push to GHCR + capture digest
+        id: push
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: |
+          # helm push prints "Digest: sha256:..." on success; capture for cosign
+          helm push "stackweaver-${VERSION}.tgz" oci://ghcr.io/vhco-pro/charts 2>&1 | tee push.log
+          DIGEST=$(grep -oE 'sha256:[a-f0-9]{64}' push.log | head -1)
+          if [ -z "$DIGEST" ]; then
+            echo "::error::Could not extract sha256 digest from helm push output"
+            exit 1
+          fi
+          REF="ghcr.io/vhco-pro/charts/stackweaver@${DIGEST}"
+          echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
+          echo "ref=${REF}" >> "$GITHUB_OUTPUT"
+          echo "tarball=stackweaver-${VERSION}.tgz" >> "$GITHUB_OUTPUT"
+          echo "::notice::Published ${REF}"
+
+      - name: Cosign sign chart (Sigstore keyless)
+        env:
+          COSIGN_YES: "true"
+        run: cosign sign "${{ steps.push.outputs.ref }}"
+
+      - name: Generate SBOM (SPDX) for the chart tarball
+        env:
+          TARBALL: ${{ steps.push.outputs.tarball }}
+        run: syft scan "file:${TARBALL}" -o spdx-json=sbom.spdx.json
+
+      - name: Cosign attest SBOM (Sigstore keyless)
+        env:
+          COSIGN_YES: "true"
+        run: cosign attest --predicate sbom.spdx.json --type spdx "${{ steps.push.outputs.ref }}"
+
+      # GitHub-native attestations require GitHub Advanced Security on private
+      # repos. They are skipped on private satellites and auto-activate on
+      # the Wave-6 visibility flip (no further edit needed).
+      - name: Attest build provenance (SLSA L3)
+        if: github.event.repository.visibility == 'public'
+        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
+        with:
+          subject-name: ghcr.io/vhco-pro/charts/stackweaver
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
+
+      - name: Attest SBOM (SPDX)
+        if: github.event.repository.visibility == 'public'
+        uses: actions/attest-sbom@c604332985a26aa8cf1bdc465b92731239ec6b9e # v4.1.0
+        with:
+          subject-name: ghcr.io/vhco-pro/charts/stackweaver
+          subject-digest: ${{ steps.push.outputs.digest }}
+          sbom-path: sbom.spdx.json
+          push-to-registry: true
 
       - name: Update README version
+        env:
+          VERSION: ${{ github.ref_name }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          sed -i "s|--version [0-9]\+\.[0-9]\+\.[0-9]\+|--version ${{ github.ref_name }}|g" README.md
+          sed -i "s|--version [0-9]\+\.[0-9]\+\.[0-9]\+|--version ${VERSION}|g" README.md
           git add README.md
-          git commit -m "chore: update README to ${{ github.ref_name }} [skip ci]" || echo "No changes to commit"
+          git commit -m "chore: update README to ${VERSION} [skip ci]" || echo "No changes to commit"
           git push origin HEAD:main || echo "Push failed"
 
       - name: Changelog & GitHub Release
-        uses: michielvha/changelog-release-action@main
+        uses: michielvha/changelog-release-action@81984f615bdcb8f88bbf92f49cae8d70f0fce099 # main snapshot 2026-05-23
         with:
           version: ${{ github.ref_name }}
           type: helm
