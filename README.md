@@ -33,7 +33,7 @@ cosign verify \
   ghcr.io/vhco-pro/charts/stackweaver:<chart-version>
 ```
 
-The full verification guide — including SBOM extraction, SLSA provenance (live after the Wave-6 visibility flip), and `gitsign verify` for sync commits — lives at <https://sw.vhco.pro/docs/security/verifying-releases>.
+The full verification guide including SBOM extraction, SLSA provenance (live after the Wave-6 visibility flip), and `gitsign verify` for sync commits lives at <https://sw.vhco.pro/docs/security/verifying-releases>.
 
 ## Trademark
 
