@@ -121,7 +121,7 @@ spec:
                 {{ .Values.storage.bucket }} --key "$${STORAGE_ACCESS_KEY}" 2>/dev/null || true
 
               echo "Garage initialized successfully"
-              # Sleep forever — sidecar must stay alive or the pod enters CrashLoopBackOff.
+              # Sleep forever, sidecar must stay alive or the pod enters CrashLoopBackOff.
               # Uses zero CPU (interruptible sleep). Same pattern as zitadel-init sidecar.
               exec sleep infinity
           env:

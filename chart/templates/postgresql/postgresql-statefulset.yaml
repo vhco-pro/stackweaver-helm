@@ -106,7 +106,7 @@ spec:
         {{- end }}
   {{- end }}
 ---
-# Init SQL ConfigMap — enables uuid-ossp extension and creates zitadel database
+# Init SQL ConfigMap, enables uuid-ossp extension and creates zitadel database
 apiVersion: v1
 kind: ConfigMap
 metadata:

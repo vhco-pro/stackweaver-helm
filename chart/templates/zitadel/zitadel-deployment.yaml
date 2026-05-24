@@ -131,7 +131,7 @@ spec:
             readOnlyRootFilesystem: true
           env:
             - name: ZITADEL_ISSUER
-              value: "{{ include "stackweaver.zitadel.issuer" . }}/ui/v2/login"
+              value: "{{ include "stackweaver.zitadel.issuer" . }}"
             # Use localhost since we're in the same pod as Zitadel
             - name: ZITADEL_INTERNAL_ADDR
               value: "localhost:8080"
@@ -169,8 +169,6 @@ spec:
               value: {{ include "stackweaver.fullname" . }}-api
             - name: K8S_FRONTEND_DEPLOYMENT
               value: {{ include "stackweaver.fullname" . }}-frontend
-            - name: K8S_LOGIN_UI_DEPLOYMENT
-              value: {{ include "stackweaver.fullname" . }}-login-ui
             # Secret key name overrides
             - name: K8S_KEY_CLIENT_ID
               value: {{ .Values.secrets.zitadel.keys.clientId }}
