@@ -117,6 +117,55 @@ jobs:
           git commit -m "chore: update README to ${VERSION} [skip ci]" || echo "No changes to commit"
           git push origin HEAD:main || echo "Push failed"
 
+      - name: Download SLSA provenance bundle
+        if: ${{ github.event.repository.visibility == 'public' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DIGEST: ${{ steps.push.outputs.digest }}
+        run: |
+          set -euo pipefail
+          gh attestation download \
+            "oci://ghcr.io/vhco-pro/charts/stackweaver@${DIGEST}" \
+            --predicate-type https://slsa.dev/provenance/v1 \
+            -R "${{ github.repository }}" || { echo "::warning::SLSA provenance download failed"; exit 0; }
+          f=$(ls -1 *.jsonl 2>/dev/null | head -1 || true)
+          if [ -n "${f}" ]; then mv "${f}" provenance.intoto.jsonl; fi
+
+      - name: Download SPDX SBOM bundle
+        if: ${{ github.event.repository.visibility == 'public' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DIGEST: ${{ steps.push.outputs.digest }}
+        run: |
+          set -euo pipefail
+          gh attestation download \
+            "oci://ghcr.io/vhco-pro/charts/stackweaver@${DIGEST}" \
+            --predicate-type https://spdx.dev/Document/v2.3 \
+            -R "${{ github.repository }}" || { echo "::warning::SBOM download failed"; exit 0; }
+          f=$(ls -1 *.jsonl 2>/dev/null | grep -v '^provenance.intoto.jsonl$' | head -1 || true)
+          if [ -n "${f}" ]; then mv "${f}" sbom.spdx.intoto.jsonl; fi
+
+      - name: Generate checksums
+        if: ${{ github.event.repository.visibility == 'public' }}
+        run: |
+          set -euo pipefail
+          if ls *.intoto.jsonl 1>/dev/null 2>&1; then
+            sha256sum *.intoto.jsonl > checksums.txt
+            cat checksums.txt
+          fi
+
+      - name: Attach assets to GitHub Release
+        if: ${{ github.event.repository.visibility == 'public' }}
+        uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3.0.0
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: |
+            provenance.intoto.jsonl
+            sbom.spdx.intoto.jsonl
+            checksums.txt
+            ${{ steps.push.outputs.tarball }}
+          fail_on_unmatched_files: false
+
       - name: Changelog & GitHub Release
         uses: michielvha/changelog-release-action@81984f615bdcb8f88bbf92f49cae8d70f0fce099 # main snapshot 2026-05-23
         with:
