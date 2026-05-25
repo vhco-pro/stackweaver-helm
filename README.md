@@ -1,5 +1,7 @@
 # Stackweaver™ Helm Chart
 
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/vhco-pro/stackweaver-helm/badge)](https://scorecard.dev/viewer/?uri=github.com/vhco-pro/stackweaver-helm)
+
 Helm chart for deploying [Stackweaver](https://github.com/vhco-pro/stackweaver) on Kubernetes.
 
 > [!IMPORTANT]
