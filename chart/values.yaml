@@ -439,3 +439,4 @@ customCA:
   existingSecret: ""
   # Key within the Secret or ConfigMap that holds the PEM-encoded cert(s).
   key: ca.crt
+# sync smoke test 1779753492
