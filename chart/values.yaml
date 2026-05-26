@@ -315,7 +315,7 @@ garage:
   enabled: true
   image:
     repository: dxflrs/garage
-    tag: v2.2.0
+    tag: v2.3.0
   storage:
     size: 10Gi
     storageClass: ""
