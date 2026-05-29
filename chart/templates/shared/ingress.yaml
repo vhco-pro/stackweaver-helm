@@ -34,6 +34,23 @@ spec:
                   number: {{ .Values.api.port }}
           # Auth proxy (OIDC + Session API) for the custom login UI —
           # routes under /auth/* live on the API, not under /api/v2/*.
+          # IMPORTANT: /auth/callback and /auth/login are SPA routes handled
+          # by the frontend React Router — they must be listed BEFORE the
+          # /auth catch-all so nginx matches the longer path first.
+          - path: /auth/callback
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "stackweaver.fullname" . }}-frontend
+                port:
+                  number: {{ .Values.frontend.port }}
+          - path: /auth/login
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "stackweaver.fullname" . }}-frontend
+                port:
+                  number: {{ .Values.frontend.port }}
           - path: /auth
             pathType: Prefix
             backend:
