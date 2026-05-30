@@ -38,7 +38,7 @@ jobs:
       # 'helm registry login' wrote to ~/.config/helm/registry/config.json,
       # which cosign does not read — leading to UNAUTHORIZED on signature push.
       - name: Login to GHCR
-        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
+        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4.2.0
         with:
           registry: ghcr.io
           username: vhco-pro
