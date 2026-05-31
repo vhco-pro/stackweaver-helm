@@ -66,6 +66,21 @@ spec:
                 name: {{ include "stackweaver.fullname" . }}-api
                 port:
                   number: {{ .Values.api.port }}
+          # OIDC discovery (Azure AD calls these to verify workload identity tokens)
+          - path: /.well-known/openid-configuration
+            pathType: Exact
+            backend:
+              service:
+                name: {{ include "stackweaver.fullname" . }}-api
+                port:
+                  number: {{ .Values.api.port }}
+          - path: /.well-known/jwks
+            pathType: Exact
+            backend:
+              service:
+                name: {{ include "stackweaver.fullname" . }}-api
+                port:
+                  number: {{ .Values.api.port }}
           # Terraform module registry
           - path: /v1/modules
             pathType: Prefix

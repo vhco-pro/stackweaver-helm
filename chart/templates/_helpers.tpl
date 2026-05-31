@@ -320,7 +320,6 @@ nginx.ingress.kubernetes.io/proxy-body-size: "100m"
 nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
 nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
 {{- else if eq .Values.ingress.provider "nginx-inc" }}
-nginx.org/path-regex: "case_sensitive"
 nginx.org/client-max-body-size: "100m"
 nginx.org/proxy-read-timeout: "3600s"
 nginx.org/proxy-send-timeout: "3600s"
