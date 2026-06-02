@@ -86,6 +86,12 @@ jobs:
           COSIGN_YES: "true"
         run: cosign attest --predicate sbom.spdx.json --type spdx "${{ steps.push.outputs.ref }}"
 
+      - name: Cosign attest OpenVEX (Sigstore keyless)
+        if: ${{ hashFiles('security/vex/stackweaver-helm.openvex.json') != '' }}
+        env:
+          COSIGN_YES: "true"
+        run: cosign attest --predicate security/vex/stackweaver-helm.openvex.json --type openvex "${{ steps.push.outputs.ref }}"
+
       # GitHub-native attestations require GitHub Advanced Security on private
       # repos. They are skipped on private satellites and auto-activate on
       # the Wave-6 visibility flip (no further edit needed).
