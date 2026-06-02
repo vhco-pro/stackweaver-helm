@@ -238,12 +238,12 @@ Zitadel internal address (for in-cluster gRPC/HTTP calls between services).
 {{- end }}
 
 {{/*
-Zitadel external issuer URL (browser-reachable, used for OIDC iss claim validation).
+Zitadel external issuer URL (browser-reachable). Used by the backend for OIDC
+iss-claim validation and surfaced in NOTES; the SPA does no client-side iss
+validation, so this is not injected into the frontend env.js.
 */}}
 {{- define "stackweaver.zitadel.issuer" -}}
-{{- if (index .Values.frontend.env "VITE_ZITADEL_ISSUER") }}
-{{- index .Values.frontend.env "VITE_ZITADEL_ISSUER" }}
-{{- else if .Values.zitadel.bundled }}
+{{- if .Values.zitadel.bundled }}
 {{- $scheme := ternary "https" "http" .Values.ingress.tls.enabled }}
 {{- printf "%s://%s" $scheme .Values.ingress.hosts.auth }}
 {{- else }}
