@@ -46,6 +46,16 @@ spec:
             # ── Workspaces ──
             - name: WORKSPACES_DIR
               value: /home/iac/workspaces
+            # ── Ansible ──
+            # Default home under the writable /tmp emptyDir so Ansible can create
+            # its local temp dir under the read-only root filesystem. The runner
+            # overrides this per-job/per-sync onto the workspaces volume.
+            - name: ANSIBLE_HOME
+              value: /tmp/.ansible
+            # Module "remote" temp dir. For local-connection tasks the target is
+            # this read-only container, so it must live under writable /tmp.
+            - name: ANSIBLE_REMOTE_TMP
+              value: /tmp/.ansible/tmp
             # ── Extra env vars (user overrides) ──
             {{- range $key, $value := .Values.ansibleRunner.env }}
             - name: {{ $key }}
@@ -64,7 +74,8 @@ spec:
           persistentVolumeClaim:
             claimName: {{ .Values.runnerWorkspaces.existingClaim | default (printf "%s-runner-workspaces" (include "stackweaver.fullname" .)) }}
         - name: tmp
-          emptyDir: {}
+          emptyDir:
+            sizeLimit: {{ .Values.ansibleRunner.tmpSizeLimit | default "1Gi" }}
         {{- include "stackweaver.customCA.volume" . | nindent 8 }}
       {{- with .Values.ansibleRunner.nodeSelector }}
       nodeSelector:
