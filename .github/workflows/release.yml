@@ -29,6 +29,12 @@ jobs:
 
       - name: Install cosign
         uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          # Pin to v3.0.3+: cosign v3 defaults --new-bundle-format=true, and the
+          # cosign-installer v3->v4 bump silently moved the default binary from
+          # v2.x to v3.x. v3.0.0-3.0.2 fail `cosign attest` of the SPDX SBOM with
+          # "invalid attestation: decoding json"; v3.0.3 ships the decoding fixes.
+          cosign-release: 'v3.0.3'
 
       - name: Install syft
         uses: anchore/sbom-action/download-syft@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
