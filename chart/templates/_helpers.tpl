@@ -215,7 +215,7 @@ Storage region, "garage" for bundled, configurable for external.
 {{- end }}
 
 {{- define "stackweaver.secrets.oidc" -}}
-{{- .Values.secrets.oidc.secretName | default "" }}
+{{- .Values.secrets.oidc.secretName | default (printf "%s-oidc" (include "stackweaver.fullname" .)) }}
 {{- end }}
 
 {{- define "stackweaver.secrets.githubApp" -}}
