@@ -43,6 +43,22 @@ spec:
             {{- include "stackweaver.env.storage" . | nindent 12 }}
             # ── Encryption ──
             {{- include "stackweaver.env.encryption" . | nindent 12 }}
+            # ── OIDC Workload Identity ──
+            {{- if .Values.oidc.issuerUrl }}
+            - name: OIDC_ISSUER_URL
+              value: {{ .Values.oidc.issuerUrl | quote }}
+            {{- else }}
+            - name: OIDC_ISSUER_URL
+              value: {{ include "stackweaver.api.url" . | quote }}
+            {{- end }}
+            {{- if .Values.secrets.oidc.secretName }}
+            - name: OIDC_SIGNING_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.oidc.secretName }}
+                  key: {{ .Values.secrets.oidc.keys.signingKey }}
+                  optional: true
+            {{- end }}
             # ── Workspaces ──
             - name: WORKSPACES_DIR
               value: /home/iac/workspaces
