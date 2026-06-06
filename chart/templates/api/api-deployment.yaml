@@ -156,14 +156,12 @@ spec:
             - name: OIDC_ISSUER_URL
               value: {{ .Values.oidc.issuerUrl | quote }}
             {{- end }}
-            {{- if .Values.secrets.oidc.secretName }}
             - name: OIDC_SIGNING_KEY
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.secrets.oidc.secretName }}
+                  name: {{ include "stackweaver.secrets.oidc" . }}
                   key: {{ .Values.secrets.oidc.keys.signingKey }}
                   optional: true
-            {{- end }}
             # ── CORS ──
             {{- if .Values.api.corsExtraOrigins }}
             - name: CORS_EXTRA_ORIGINS

@@ -51,14 +51,12 @@ spec:
             - name: OIDC_ISSUER_URL
               value: {{ include "stackweaver.api.url" . | quote }}
             {{- end }}
-            {{- if .Values.secrets.oidc.secretName }}
             - name: OIDC_SIGNING_KEY
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.secrets.oidc.secretName }}
+                  name: {{ include "stackweaver.secrets.oidc" . }}
                   key: {{ .Values.secrets.oidc.keys.signingKey }}
                   optional: true
-            {{- end }}
             # ── Workspaces ──
             - name: WORKSPACES_DIR
               value: /home/iac/workspaces
