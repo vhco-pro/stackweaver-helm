@@ -16,7 +16,7 @@ Access the application by port-forwarding:
 
 ── Secrets ──
 
-{{- if or (not .Values.secrets.postgresql.secretName) (not .Values.secrets.minio.secretName) (not .Values.secrets.encryption.secretName) (not .Values.secrets.zitadel.secretName) }}
+{{- if or (not .Values.secrets.postgresql.secretName) (not .Values.secrets.storage.secretName) (not .Values.secrets.encryption.secretName) (not .Values.secrets.zitadel.secretName) }}
 
 The chart has auto-generated secrets for components where you didn't
 provide an external secretName. They are preserved across upgrades.
