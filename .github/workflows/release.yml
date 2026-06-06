@@ -81,21 +81,22 @@ jobs:
           TARBALL: ${{ steps.push.outputs.tarball }}
         run: syft scan "file:${TARBALL}" -o spdx-json=sbom.spdx.json
 
-      # --new-bundle-format=false keeps the legacy OCI attestation format.
-      # cosign v3 flipped this default to true; the new bundle-signing path
-      # fails on the SPDX/OpenVEX predicates with "invalid attestation:
-      # decoding json". Forcing false restores the pre-v3 behavior while
-      # letting cosign itself stay on the latest release.
+      # Cosign keyless attestation is the PRIVATE-repo supply-chain path.
+      # On public repos the GitHub-native attestations below (actions/attest-*)
+      # are the active mechanism, so these are gated to private only. cosign v3
+      # also cannot run them: keyless forces --new-bundle-format=true, which
+      # then fails these predicates with "invalid attestation: decoding json".
       - name: Cosign attest SBOM (Sigstore keyless)
+        if: github.event.repository.visibility != 'public'
         env:
           COSIGN_YES: "true"
-        run: cosign attest --new-bundle-format=false --predicate sbom.spdx.json --type spdx "${{ steps.push.outputs.ref }}"
+        run: cosign attest --predicate sbom.spdx.json --type spdx "${{ steps.push.outputs.ref }}"
 
       - name: Cosign attest OpenVEX (Sigstore keyless)
-        if: ${{ hashFiles('security/vex/stackweaver-helm.openvex.json') != '' }}
+        if: ${{ github.event.repository.visibility != 'public' && hashFiles('security/vex/stackweaver-helm.openvex.json') != '' }}
         env:
           COSIGN_YES: "true"
-        run: cosign attest --new-bundle-format=false --predicate security/vex/stackweaver-helm.openvex.json --type openvex "${{ steps.push.outputs.ref }}"
+        run: cosign attest --predicate security/vex/stackweaver-helm.openvex.json --type openvex "${{ steps.push.outputs.ref }}"
 
       # GitHub-native attestations require GitHub Advanced Security on private
       # repos. They are skipped on private satellites and auto-activate on
@@ -115,6 +116,19 @@ jobs:
           subject-name: ghcr.io/vhco-pro/charts/stackweaver
           subject-digest: ${{ steps.push.outputs.digest }}
           sbom-path: sbom.spdx.json
+          push-to-registry: true
+
+      # GitHub-native replacement for the cosign OpenVEX attestation, since
+      # actions/attest-sbom only covers SPDX. Uses the same predicate type
+      # (https://openvex.dev/ns) cosign emitted for --type openvex.
+      - name: Attest OpenVEX (GitHub-native)
+        if: ${{ github.event.repository.visibility == 'public' && hashFiles('security/vex/stackweaver-helm.openvex.json') != '' }}
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+        with:
+          subject-name: ghcr.io/vhco-pro/charts/stackweaver
+          subject-digest: ${{ steps.push.outputs.digest }}
+          predicate-type: https://openvex.dev/ns
+          predicate-path: security/vex/stackweaver-helm.openvex.json
           push-to-registry: true
 
       - name: Update README version
