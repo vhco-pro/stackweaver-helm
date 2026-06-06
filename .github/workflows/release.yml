@@ -81,26 +81,11 @@ jobs:
           TARBALL: ${{ steps.push.outputs.tarball }}
         run: syft scan "file:${TARBALL}" -o spdx-json=sbom.spdx.json
 
-      # Cosign keyless attestation is the PRIVATE-repo supply-chain path.
-      # On public repos the GitHub-native attestations below (actions/attest-*)
-      # are the active mechanism, so these are gated to private only. cosign v3
-      # also cannot run them: keyless forces --new-bundle-format=true, which
-      # then fails these predicates with "invalid attestation: decoding json".
-      - name: Cosign attest SBOM (Sigstore keyless)
-        if: github.event.repository.visibility != 'public'
-        env:
-          COSIGN_YES: "true"
-        run: cosign attest --predicate sbom.spdx.json --type spdx "${{ steps.push.outputs.ref }}"
-
-      - name: Cosign attest OpenVEX (Sigstore keyless)
-        if: ${{ github.event.repository.visibility != 'public' && hashFiles('security/vex/stackweaver-helm.openvex.json') != '' }}
-        env:
-          COSIGN_YES: "true"
-        run: cosign attest --predicate security/vex/stackweaver-helm.openvex.json --type openvex "${{ steps.push.outputs.ref }}"
-
-      # GitHub-native attestations require GitHub Advanced Security on private
-      # repos. They are skipped on private satellites and auto-activate on
-      # the Wave-6 visibility flip (no further edit needed).
+      # Attestations are GitHub-native (actions/attest-*). cosign only SIGNS the
+      # chart (above); cosign v3 cannot ATTEST here (keyless forces the new
+      # bundle format, which fails these predicates with "decoding json"), so
+      # the chart SBOM / provenance / VEX are attested via the GitHub
+      # attestation API instead. Public-gated to mirror the docker satellites.
       - name: Attest build provenance (SLSA L3)
         if: github.event.repository.visibility == 'public'
         uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
@@ -118,16 +103,16 @@ jobs:
           sbom-path: sbom.spdx.json
           push-to-registry: true
 
-      # GitHub-native replacement for the cosign OpenVEX attestation, since
-      # actions/attest-sbom only covers SPDX. Uses the same predicate type
-      # (https://openvex.dev/ns) cosign emitted for --type openvex.
+      # OpenVEX attestation — actions/attest-sbom only covers SPDX. Predicate
+      # type matches the docker satellites + the documented verify command so a
+      # single `gh attestation verify --predicate-type` works fleet-wide.
       - name: Attest OpenVEX (GitHub-native)
         if: ${{ github.event.repository.visibility == 'public' && hashFiles('security/vex/stackweaver-helm.openvex.json') != '' }}
         uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
         with:
           subject-name: ghcr.io/vhco-pro/charts/stackweaver
           subject-digest: ${{ steps.push.outputs.digest }}
-          predicate-type: https://openvex.dev/ns
+          predicate-type: https://openvex.dev/ns/v0.2.0
           predicate-path: security/vex/stackweaver-helm.openvex.json
           push-to-registry: true
 
