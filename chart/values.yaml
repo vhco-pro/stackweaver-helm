@@ -240,6 +240,20 @@ ansibleRunner:
   # Size limit for the writable /tmp emptyDir (Ansible local temp, SSH control
   # sockets). Bounds ephemeral disk use under the read-only root filesystem.
   tmpSizeLimit: 1Gi
+  # AKS Workload Identity for Azure dynamic-inventory sync (auth_method:
+  # workload_identity). When enabled, the ansible-runner pod gets the
+  # `azure.workload.identity/use: "true"` label so the Azure webhook injects the
+  # projected SA token + AZURE_* env. You must ALSO annotate the ServiceAccount with
+  # the user-assigned managed identity's client id via `serviceAccount.annotations`:
+  #   serviceAccount:
+  #     annotations:
+  #       azure.workload.identity/client-id: <MI-CLIENT-ID>
+  # Note: the SA is shared across all stackweaver pods, so the annotation applies
+  # cluster-wide. Managed Identity via IMDS (auth_method: managed_identity) needs
+  # none of this — only a node/kubelet or user-assigned identity with Reader on the
+  # target subscription.
+  workloadIdentity:
+    enabled: false
 # ── Storage ───────────────────────────────────────────────────────────────────
 # All data (state, configs, registry, logs, ansible artifacts) is stored in a
 # single S3-compatible bucket. Any S3-compatible service works: AWS S3, R2, B2,
