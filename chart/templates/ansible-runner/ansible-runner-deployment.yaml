@@ -16,6 +16,9 @@ spec:
       labels:
         {{- include "stackweaver.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: ansible-runner
+        {{- if .Values.ansibleRunner.workloadIdentity.enabled }}
+        azure.workload.identity/use: "true"
+        {{- end }}
       {{- with .Values.ansibleRunner.podAnnotations }}
       annotations:
         {{- toYaml . | nindent 8 }}
