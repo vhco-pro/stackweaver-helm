@@ -57,6 +57,14 @@ spec:
                   name: {{ include "stackweaver.secrets.oidc" . }}
                   key: {{ .Values.secrets.oidc.keys.signingKey }}
                   optional: true
+            # ── Writable HOME ──
+            # With readOnlyRootFilesystem the image's /usr/local/bin isn't
+            # writable, so the runner installs versioned terraform binaries under
+            # $HOME/.terraform-versions (core/plugins/terraform/plugin.go). The
+            # default home (/home/iac) is read-only too, so point HOME at the
+            # writable /tmp emptyDir — mirrors ANSIBLE_HOME on the ansible-runner.
+            - name: HOME
+              value: /tmp
             # ── Workspaces ──
             - name: WORKSPACES_DIR
               value: /home/iac/workspaces
