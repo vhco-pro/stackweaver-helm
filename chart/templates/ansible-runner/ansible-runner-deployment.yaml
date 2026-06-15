@@ -47,12 +47,15 @@ spec:
             # ── Encryption ──
             {{- include "stackweaver.env.encryption" . | nindent 12 }}
             # ── OIDC Workload Identity ──
+            # Only set when explicitly configured. Do NOT fall back to the API URL:
+            # that produces a {host}/api/v2 issuer, but external verifiers (Azure
+            # Entra) fetch {issuer}/.well-known/openid-configuration, served only at
+            # the ingress root. A missing issuer leaves this unset so the runner uses
+            # its localhost default and warns loudly if an auth_method=oidc Azure
+            # inventory actually needs it — rather than minting a doomed /api/v2 token.
             {{- if .Values.oidc.issuerUrl }}
             - name: OIDC_ISSUER_URL
               value: {{ .Values.oidc.issuerUrl | quote }}
-            {{- else }}
-            - name: OIDC_ISSUER_URL
-              value: {{ include "stackweaver.api.url" . | quote }}
             {{- end }}
             - name: OIDC_SIGNING_KEY
               valueFrom:
