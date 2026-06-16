@@ -35,6 +35,15 @@ spec:
           imagePullPolicy: {{ .Values.ansibleRunner.image.pullPolicy }}
           securityContext:
             readOnlyRootFilesystem: true
+            # Defense-in-depth: the runner needs no Linux capabilities (privilege
+            # escalation for Ansible "become" happens on the target host over SSH,
+            # not in this container), so drop them all and forbid regaining any.
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            seccompProfile:
+              type: RuntimeDefault
           env:
             - name: LOG_LEVEL
               value: info
@@ -82,17 +91,37 @@ spec:
               value: {{ $value | quote }}
             {{- end }}
           volumeMounts:
+            # Per-job scratch (playbook checkout, inventory, staged credentials).
+            # Ephemeral and isolated from the terraform runner — it holds no run
+            # history (output/status/events live in Postgres + object storage).
             - name: workspaces
               mountPath: /home/iac/workspaces
+            # Dedicated per-project Ansible Galaxy cache, nested under the scratch
+            # mount at the path the runner derives (WORKSPACES_DIR/galaxy-cache).
+            # A regenerable performance cache, kept off the shared runner volume.
+            - name: galaxy-cache
+              mountPath: /home/iac/workspaces/galaxy-cache
             - name: tmp
               mountPath: /tmp
             {{- include "stackweaver.customCA.volumeMount" . | nindent 12 }}
           resources:
             {{- toYaml .Values.ansibleRunner.resources | nindent 12 }}
       volumes:
+        # Ephemeral per-job scratch. Not the shared runner-workspaces PVC: the
+        # ansible runner cleans job dirs per run and keeps no durable data here,
+        # so an emptyDir gives full isolation from the terraform runner with no
+        # data-loss surface and no dependency on RWX storage.
         - name: workspaces
+          emptyDir:
+            sizeLimit: {{ .Values.ansibleRunner.workspacesSizeLimit | default "5Gi" }}
+        - name: galaxy-cache
+          {{- if .Values.ansibleRunner.galaxyCache.enabled }}
           persistentVolumeClaim:
-            claimName: {{ .Values.runnerWorkspaces.existingClaim | default (printf "%s-runner-workspaces" (include "stackweaver.fullname" .)) }}
+            claimName: {{ .Values.ansibleRunner.galaxyCache.existingClaim | default (printf "%s-ansible-galaxy-cache" (include "stackweaver.fullname" .)) }}
+          {{- else }}
+          emptyDir:
+            sizeLimit: {{ .Values.ansibleRunner.galaxyCache.sizeLimit | default "5Gi" }}
+          {{- end }}
         - name: tmp
           emptyDir:
             sizeLimit: {{ .Values.ansibleRunner.tmpSizeLimit | default "1Gi" }}

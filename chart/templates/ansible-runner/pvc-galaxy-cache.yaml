@@ -1,0 +1,18 @@
+{{- if and .Values.ansibleRunner.galaxyCache.enabled (not .Values.ansibleRunner.galaxyCache.existingClaim) }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "stackweaver.fullname" . }}-ansible-galaxy-cache
+  labels:
+    {{- include "stackweaver.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ansible-runner
+spec:
+  accessModes:
+    - {{ .Values.ansibleRunner.galaxyCache.accessMode | default "ReadWriteOnce" }}
+  resources:
+    requests:
+      storage: {{ .Values.ansibleRunner.galaxyCache.size | default "5Gi" }}
+  {{- if .Values.ansibleRunner.galaxyCache.storageClass }}
+  storageClassName: {{ .Values.ansibleRunner.galaxyCache.storageClass | quote }}
+  {{- end }}
+{{- end }}
