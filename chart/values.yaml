@@ -240,6 +240,25 @@ ansibleRunner:
   # Size limit for the writable /tmp emptyDir (Ansible local temp, SSH control
   # sockets). Bounds ephemeral disk use under the read-only root filesystem.
   tmpSizeLimit: 1Gi
+  # Size limit for the per-job scratch emptyDir mounted at /home/iac/workspaces
+  # (playbook checkout, inventory, staged credentials, Galaxy install staging).
+  # Cleaned per job and isolated from the terraform runner's volume; it holds no
+  # run history (output/status/events live in Postgres + object storage), so an
+  # emptyDir is safe and survives nothing it needs to.
+  workspacesSizeLimit: 5Gi
+  # Dedicated per-project Ansible Galaxy cache, mounted at
+  # /home/iac/workspaces/galaxy-cache and kept off the shared runner volume.
+  # The cache is a regenerable performance optimization — collections simply
+  # re-download if it is lost — so modest sizing and ReadWriteOnce are fine.
+  # Set enabled=false to fall back to an ephemeral emptyDir (cold cache on every
+  # pod restart). For replicas > 1, set accessMode to ReadWriteMany.
+  galaxyCache:
+    enabled: true
+    size: 5Gi
+    storageClass: ""
+    accessMode: ReadWriteOnce
+    existingClaim: ""  # if set, skip PVC creation and use this pre-existing claim name
+    sizeLimit: 5Gi     # only used when enabled=false (emptyDir size cap)
   # AKS Workload Identity for Azure dynamic-inventory sync (auth_method:
   # workload_identity). When enabled, the ansible-runner pod gets the
   # `azure.workload.identity/use: "true"` label so the Azure webhook injects the
