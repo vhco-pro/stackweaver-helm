@@ -39,6 +39,8 @@ spec:
             {{- include "stackweaver.env.database" . | nindent 12 }}
             # ── Redis ──
             {{- include "stackweaver.env.redis" . | nindent 12 }}
+            # ── Encryption (decrypts VCS connection tokens at rest; must match the API key) ──
+            {{- include "stackweaver.env.encryption" . | nindent 12 }}
             # ── GitHub App (for PR status checks) ──
             {{- if .Values.secrets.githubApp.secretName }}
             - name: GITHUB_APP_ID
