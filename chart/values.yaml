@@ -31,7 +31,9 @@ serviceAccount:
 # The API is routed via /api/v2, /.well-known/terraform.json, /v1/modules, /health.
 # Everything else on the app host goes to the frontend.
 ingress:
+  # -- Create the app + auth Ingress resources
   enabled: true
+  # -- IngressClass name for both Ingress resources
   className: nginx
   # Ingress controller provider, selects annotation presets.
   # Options: nginx-inc | community-nginx | traefik | none
@@ -39,17 +41,23 @@ ingress:
   #   community-nginx:  Community NGINX ingress controller (nginx.ingress.kubernetes.io/*), sunset project
   #   traefik:          Traefik ingress controller (minimal annotations; use middleware CRDs for advanced config)
   #   none:             No controller-specific annotations, supply everything via annotations/appAnnotations/authAnnotations
+  # -- Ingress controller provider; selects annotation presets (`nginx-inc` | `community-nginx` | `traefik` | `none`)
   provider: nginx-inc
   annotations: {}
   # Per-ingress annotation overrides (merged on top of provider presets + annotations)
   appAnnotations: {}
   authAnnotations: {}
   tls:
+    # -- Enable TLS on both Ingress resources
     enabled: true
+    # -- TLS secret for the app domain
     secretName: stackweaver-tls
+    # -- TLS secret for the auth domain
     authSecretName: stackweaver-auth-tls
   hosts:
+    # -- App domain (Frontend + API)
     app: stackweaver.example.com
+    # -- Auth domain (Zitadel + Login UI)
     auth: auth.stackweaver.example.com
 # ── External Secrets ──────────────────────────────────────────────────────────
 #
@@ -65,11 +73,13 @@ secrets:
   # PostgreSQL credentials
   # Auto-generates a random 24-char password when secretName is empty.
   postgresql:
+    # -- External PostgreSQL secret name; empty auto-generates a random password
     secretName: ""
     keys:
       password: password
   # Redis credentials (optional, only needed if Redis auth is enabled)
   redis:
+    # -- External Redis secret name (only needed when Redis auth is enabled)
     secretName: ""
     keys:
       password: password
@@ -78,6 +88,7 @@ secrets:
   # that match the bundled Garage init. When using external S3, provide your own secret.
   # Ignored entirely when storage.auth=pod-identity.
   storage:
+    # -- External S3/storage credentials secret name; empty + bundled Garage auto-generates
     secretName: ""
     keys:
       accessKey: access-key
@@ -86,6 +97,7 @@ secrets:
   # Auto-generates a random key when secretName is empty.
   # Used by API, runner, and ansible-runner for encrypting variables/credentials.
   encryption:
+    # -- External encryption-key secret name; empty auto-generates a 32-byte hex key
     secretName: ""
     keys:
       key: encryption-key
@@ -94,6 +106,7 @@ secrets:
   # After zitadel-init runs, it populates clientId, clientSecret, etc.
   # For external Zitadel: supply all keys directly.
   zitadel:
+    # -- External Zitadel secret name; empty auto-generates masterkey + admin password
     secretName: ""
     keys:
       masterkey: masterkey
@@ -108,11 +121,13 @@ secrets:
   # OIDC workload identity signing key (optional, for Azure OIDC / inventory sync)
   # When secretName is empty, the chart auto-generates an RSA key pair.
   oidc:
+    # -- External OIDC workload-identity signing-key secret; empty auto-generates an RSA key pair
     secretName: ""
     keys:
       signingKey: signing-key
   # GitHub App credentials (optional, for GitHub VCS integration)
   githubApp:
+    # -- GitHub App credentials secret name (private key + webhook secret)
     secretName: ""
     keys:
       privateKey: private-key
@@ -122,22 +137,29 @@ secrets:
 # -- API (Go backend, port 8022) --
 api:
   image:
+    # -- API image repository
     repository: ghcr.io/vhco-pro/stackweaver-api
+    # -- API image tag
     tag: latest
     pullPolicy: IfNotPresent
+  # -- API replica count
   replicas: 1
+  # -- API listen port
   port: 8022
   server:
     host: "0.0.0.0"
     readTimeout: "30s"
     writeTimeout: "30s"
+  # -- Additional CORS allowed origins (comma-separated)
   corsExtraOrigins: ""
   # Auth proxy (custom login UI), replaces the standalone zitadel-login container.
   auth:
     # return_code = codes returned inline (homelab / dev default, no SMTP needed).
     # email       = codes delivered via Zitadel's configured SMTP provider.
+    # -- Auth code delivery: `return_code` (inline, no SMTP) or `email` (via Zitadel SMTP)
     notificationMode: return_code
     # Auto-submit OTP forms when the full code is pasted (UX nicety, off by default).
+    # -- Auto-submit OTP forms when the full code is pasted
     autoSubmitCode: false
   resources:
     requests:
@@ -155,15 +177,21 @@ api:
   affinity: {}
   # GitHub App integration (non-secret config)
   githubApp:
+    # -- GitHub App ID (non-secret)
     id: ""
+    # -- GitHub App slug/name (non-secret)
     name: ""
 # -- Frontend (Chainguard nginx SPA, port 8080, non-root) --
 frontend:
   image:
+    # -- Frontend image repository
     repository: ghcr.io/vhco-pro/stackweaver-frontend
+    # -- Frontend image tag
     tag: latest
     pullPolicy: IfNotPresent
+  # -- Frontend replica count
   replicas: 1
+  # -- Frontend listen port
   port: 8080
   resources:
     requests:
@@ -180,9 +208,12 @@ frontend:
 # -- Orchestrator (background job scheduler) --
 orchestrator:
   image:
+    # -- Orchestrator image repository
     repository: ghcr.io/vhco-pro/stackweaver-orchestrator
+    # -- Orchestrator image tag
     tag: latest
     pullPolicy: IfNotPresent
+  # -- Orchestrator replica count
   replicas: 1
   resources:
     requests:
@@ -202,9 +233,12 @@ orchestrator:
 # -- Terraform Runner --
 runner:
   image:
+    # -- Terraform runner image repository
     repository: ghcr.io/vhco-pro/stackweaver-runner
+    # -- Terraform runner image tag
     tag: latest
     pullPolicy: IfNotPresent
+  # -- Terraform runner replica count
   replicas: 1
   resources:
     requests:
@@ -221,9 +255,12 @@ runner:
 # -- Ansible Runner --
 ansibleRunner:
   image:
+    # -- Ansible runner image repository
     repository: ghcr.io/vhco-pro/stackweaver-ansible-runner
+    # -- Ansible runner image tag
     tag: latest
     pullPolicy: IfNotPresent
+  # -- Ansible runner replica count
   replicas: 1
   resources:
     requests:
@@ -239,12 +276,14 @@ ansibleRunner:
   affinity: {}
   # Size limit for the writable /tmp emptyDir (Ansible local temp, SSH control
   # sockets). Bounds ephemeral disk use under the read-only root filesystem.
+  # -- Size limit for the writable `/tmp` emptyDir (Ansible local temp, SSH control sockets)
   tmpSizeLimit: 1Gi
   # Size limit for the per-job scratch emptyDir mounted at /home/iac/workspaces
   # (playbook checkout, inventory, staged credentials, Galaxy install staging).
   # Cleaned per job and isolated from the terraform runner's volume; it holds no
   # run history (output/status/events live in Postgres + object storage), so an
   # emptyDir is safe and survives nothing it needs to.
+  # -- Size limit for the per-job scratch emptyDir at `/home/iac/workspaces`
   workspacesSizeLimit: 5Gi
   # Dedicated per-project Ansible Galaxy cache, mounted at
   # /home/iac/workspaces/galaxy-cache and kept off the shared runner volume.
@@ -253,11 +292,17 @@ ansibleRunner:
   # Set enabled=false to fall back to an ephemeral emptyDir (cold cache on every
   # pod restart). For replicas > 1, set accessMode to ReadWriteMany.
   galaxyCache:
+    # -- Provision a dedicated PVC for the Galaxy cache; `false` uses an ephemeral emptyDir
     enabled: true
+    # -- Galaxy cache PVC size
     size: 5Gi
+    # -- Galaxy cache PVC storage class
     storageClass: ""
+    # -- Galaxy cache PVC access mode (`ReadWriteMany` for replicas > 1)
     accessMode: ReadWriteOnce
+    # -- Use a pre-existing PVC instead of provisioning one
     existingClaim: ""  # if set, skip PVC creation and use this pre-existing claim name
+    # -- emptyDir size cap, only used when `enabled=false`
     sizeLimit: 5Gi     # only used when enabled=false (emptyDir size cap)
   # AKS Workload Identity for Azure dynamic-inventory sync (auth_method:
   # workload_identity). When enabled, the ansible-runner pod gets the
@@ -272,6 +317,7 @@ ansibleRunner:
   # none of this — only a node/kubelet or user-assigned identity with Reader on the
   # target subscription.
   workloadIdentity:
+    # -- Enable AKS Workload Identity for Azure dynamic-inventory sync
     enabled: false
 # ── Storage ───────────────────────────────────────────────────────────────────
 # All data (state, configs, registry, logs, ansible artifacts) is stored in a
@@ -281,19 +327,29 @@ ansibleRunner:
 # and auto-configures storage to point to it. Set garage.enabled=false to use an
 # external S3-compatible service.
 storage:
+  # -- S3 bucket name for all platform data
   bucket: stackweaver
+  # -- S3 region (`garage` for the bundled store)
   region: garage
+  # -- S3 endpoint URL (empty targets the bundled Garage service)
   endpoint: ""
+  # -- Use TLS for S3 connections
   useSSL: false
+  # -- Use path-style S3 addressing (required by Garage/MinIO)
   forcePathStyle: true
   # Authentication: "credentials" (default) or "pod-identity" (IRSA/Workload Identity)
+  # -- Storage auth mode: `credentials` or `pod-identity` (IRSA/Workload Identity)
   auth: credentials
   serviceAccountAnnotations: {}
 # ── Runner Workspaces PVC ─────────────────────────────────────────────────────
 runnerWorkspaces:
+  # -- Shared runner workspaces PVC size
   size: 10Gi
+  # -- Runner workspaces PVC storage class
   storageClass: ""
+  # -- Runner workspaces PVC access mode
   accessMode: ReadWriteMany
+  # -- Use a pre-existing PVC instead of provisioning one
   existingClaim: ""  # if set, skip PVC creation and use this pre-existing claim name
 # ── Dependencies ──────────────────────────────────────────────────────────────
 #
@@ -303,17 +359,24 @@ runnerWorkspaces:
 
 # -- PostgreSQL 17 --
 postgresql:
+  # -- Deploy bundled PostgreSQL (`false` uses `postgresql.external`)
   enabled: true
   image:
     repository: postgres
     tag: "17"
   auth:
+    # -- Bundled PostgreSQL username
     username: iac
+    # -- Bundled PostgreSQL database name
     database: iac_platform
   storage:
+    # -- PostgreSQL PVC size
     size: 10Gi
+    # -- PostgreSQL PVC storage class
     storageClass: ""
+    # -- Use a pre-existing PVC instead of a volumeClaimTemplate
     existingClaim: ""  # if set, skip volumeClaimTemplate and use this pre-existing PVC
+    # -- Bind the new PVC to a specific pre-existing PV
     volumeName: ""     # if set, bind the new PVC to this specific pre-existing PV
   resources:
     requests:
@@ -323,13 +386,19 @@ postgresql:
       cpu: 500m
       memory: 512Mi
   external:
+    # -- External PostgreSQL host (when `enabled=false`)
     host: ""
+    # -- External PostgreSQL port
     port: 5432
+    # -- External PostgreSQL username
     username: ""
+    # -- External PostgreSQL database name
     database: ""
+    # -- External PostgreSQL SSL mode
     sslmode: disable
 # -- Redis 8 --
 redis:
+  # -- Deploy bundled Redis (`false` uses `redis.external`)
   enabled: true
   image:
     repository: redis
@@ -342,20 +411,27 @@ redis:
       cpu: 200m
       memory: 256Mi
   external:
+    # -- External Redis host (when `enabled=false`)
     host: ""
+    # -- External Redis port
     port: 6379
 # -- Garage (bundled S3-compatible storage) --
 # Lightweight, self-hosted, S3-compatible object store. Deployed by default.
 # Set enabled=false when using AWS S3, Cloudflare R2, or another external service.
 garage:
+  # -- Deploy the bundled Garage S3 store (`false` uses external S3 via `storage.*`)
   enabled: true
   image:
     repository: dxflrs/garage
     tag: v2.3.0
   storage:
+    # -- Garage PVC size
     size: 10Gi
+    # -- Garage PVC storage class
     storageClass: ""
+    # -- Use a pre-existing PVC instead of provisioning one
     existingClaim: ""
+    # -- Bind the new PVC to a specific pre-existing PV
     volumeName: ""
   resources:
     requests:
@@ -369,6 +445,7 @@ garage:
 # Set bundled=true to deploy Zitadel in this chart, or bundled=false to use
 # an external Zitadel instance. In both cases, provide credentials in secrets.zitadel.
 zitadel:
+  # -- Deploy bundled Zitadel (`false` uses `zitadel.external`)
   bundled: true
   image:
     repository: ghcr.io/zitadel/zitadel
@@ -381,9 +458,13 @@ zitadel:
       cpu: "2"
       memory: 1Gi
   config:
+    # -- OIDC access token lifetime
     accessTokenLifetime: 12h
+    # -- OIDC ID token lifetime
     idTokenLifetime: 12h
+    # -- Refresh token idle expiration
     refreshTokenIdleExpiration: 720h # 30 days
+    # -- Refresh token absolute expiration
     refreshTokenExpiration: 2160h # 90 days
   init:
     image:
@@ -394,6 +475,7 @@ zitadel:
     # Written to the zitadel secret under "admin-username" so operators can discover it
     # without reading the docs. Only effective on first install, changing after
     # install has no effect (Zitadel FirstInstance config only runs once).
+    # -- Email for the initial Zitadel admin account (first install only)
     adminUsername: "admin@stackweaver.local"
     resources:
       requests:
@@ -405,12 +487,15 @@ zitadel:
   # External Zitadel settings (when bundled=false)
   external:
     # Public issuer URL (e.g. https://auth.example.com)
+    # -- External Zitadel public issuer URL (when `bundled=false`)
     issuer: ""
     # In-cluster address for gRPC/HTTP calls (e.g. zitadel.other-namespace.svc:8080)
+    # -- External Zitadel in-cluster address for gRPC/HTTP calls
     internalAddr: ""
 # ── OIDC Workload Identity ───────────────────────────────────────────────────
 oidc:
   # Issuer URL for OIDC workload identity tokens (non-secret, can be left empty)
+  # -- Issuer URL for OIDC workload-identity tokens (non-secret)
   issuerUrl: ""
 # ── SSO Configuration ─────────────────────────────────────────────────────────
 #
@@ -422,19 +507,27 @@ oidc:
 # Non-secret values (client IDs, tenant ID, issuer URL) are set inline.
 # Secret values (client secrets) must be provided in a pre-existing K8s Secret.
 sso:
+  # -- Sync team membership from OIDC claims on login
   enableOidcTeamSync: false
+  # -- Remove users from non-SSO teams during sync
   oidcRemoveFromNonSsoTeams: false
   # Azure AD / Entra ID
   azureAd:
+    # -- Azure AD / Entra ID application (client) ID
     clientId: ""
+    # -- Azure AD / Entra ID directory (tenant) ID
     tenantId: ""
   # Generic OIDC provider (Okta, AWS Cognito, Keycloak, etc.)
   oidcProvider:
+    # -- Display name on the login button (e.g. "Okta", "AWS Cognito")
     name: ""       # Display name on the login button (e.g. "Okta", "AWS Cognito")
+    # -- OIDC issuer URL (must serve `/.well-known/openid-configuration`)
     issuer: ""     # OIDC issuer URL (must serve /.well-known/openid-configuration)
+    # -- OIDC provider client ID
     clientId: ""
   # Pre-existing K8s Secret containing SSO client secrets.
   # Both keys are needed if you configure Azure AD and a Generic OIDC provider simultaneously.
+  # -- Pre-existing K8s Secret holding SSO client secret(s)
   secretName: ""
   # Key names within the Secret. Override these if your existing Secret uses
   # different key names (e.g. from External Secrets Operator or Sealed Secrets).
@@ -466,13 +559,17 @@ customCA:
   #     -----BEGIN CERTIFICATE-----
   #     ...
   #     -----END CERTIFICATE-----
+  # -- Inline PEM-encoded CA cert(s); the chart creates a ConfigMap from this
   cert: ""
   # Name of a pre-existing Kubernetes ConfigMap containing the CA cert.
   # Ignored when existingSecret is set.
+  # -- Pre-existing ConfigMap holding the CA cert (ignored when `existingSecret` is set)
   existingConfigMap: ""
   # Name of a pre-existing Kubernetes Secret containing the CA cert.
   # Takes highest priority when set.
+  # -- Pre-existing Secret holding the CA cert (highest priority)
   existingSecret: ""
   # Key within the Secret or ConfigMap that holds the PEM-encoded cert(s).
+  # -- Key within the Secret/ConfigMap holding the PEM cert(s)
   key: ca.crt
 # sync smoke test 1779753492
