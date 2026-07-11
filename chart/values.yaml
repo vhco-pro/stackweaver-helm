@@ -252,6 +252,16 @@ runner:
   nodeSelector: {}
   tolerations: []
   affinity: {}
+# -- Secrets bootstrap job --
+# AUD-063: the secrets-init Job holds secret-create RBAC, so its image is pinned by immutable
+# digest (not a mutable tag) to a maintained, multi-arch kubectl image that ships a shell + the
+# coreutils the bootstrap script needs. Renovate keeps the tag+digest current (see the
+# `secrets-init kubectl image` customManager in .github/renovate.json5). Override for a private
+# mirror. (Chainguard's free `kubectl` is distroless — no shell — so it can't run this Job's script.)
+secretsInit:
+  # renovate: datasource=docker depName=alpine/k8s
+  image: alpine/k8s:1.36.2@sha256:44ef4942e171939b9c665a4a84beb80e2dcdb9a24330d4651cfdfd2e9deecc47
+
 # -- Ansible Runner --
 ansibleRunner:
   image:
