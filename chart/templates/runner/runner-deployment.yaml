@@ -32,6 +32,12 @@ spec:
           imagePullPolicy: {{ .Values.runner.image.pullPolicy }}
           securityContext:
             readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false  # AUD-063
+            capabilities:
+              drop:
+                - ALL
+            seccompProfile:
+              type: RuntimeDefault
           env:
             - name: LOG_LEVEL
               value: info

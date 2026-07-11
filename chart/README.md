@@ -399,6 +399,7 @@ The table below is generated from `values.yaml`. Boilerplate keys (resources, sc
 | secrets.zitadel.keys.webhookComplementTokenKey | string | `"webhook-complement-token-key"` |  |
 | secrets.zitadel.keys.webhookIdpSyncKey | string | `"webhook-idp-sync-key"` |  |
 | secrets.zitadel.secretName | string | `""` | External Zitadel secret name; empty auto-generates masterkey + admin password |
+| secretsInit.image | string | `"alpine/k8s:1.36.2@sha256:44ef4942e171939b9c665a4a84beb80e2dcdb9a24330d4651cfdfd2e9deecc47"` |  |
 | serviceAccount.annotations | object | `{}` |  |
 | serviceAccount.create | bool | `true` |  |
 | serviceAccount.name | string | `""` |  |
