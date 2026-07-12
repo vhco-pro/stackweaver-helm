@@ -22,9 +22,16 @@ spec:
     spec:
       {{- include "stackweaver.imagePullSecrets" . | nindent 6 }}
       serviceAccountName: {{ include "stackweaver.fullname" . }}-zitadel-init
-      # Run as root (Zitadel needs to write PAT file)
+      # AUD-079: run non-root. The Zitadel image ships a non-root `zitadel` user (uid/gid 1000);
+      # fsGroup makes the shared /pat + /tmp emptyDir volumes group-owned and group-writable, so
+      # that user can write the admin PAT and the zitadel-init sidecar can read it — no root needed.
       securityContext:
-        runAsUser: 0
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
       initContainers:
         - name: wait-for-postgresql
           image: busybox:1.36
