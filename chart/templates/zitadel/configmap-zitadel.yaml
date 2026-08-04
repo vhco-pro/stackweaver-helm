@@ -38,11 +38,25 @@ data:
           SSL:
             Mode: {{ include "stackweaver.postgresql.sslmode" . }}
 
-    # Allow Actions V2 targets to call internal/cluster-local URLs.
-    # Zitadel v4.x blocks private/loopback IPs by default (SSRF protection).
-    # We need in-cluster calls from Zitadel → API for SSO group sync webhooks.
-    Executions:
-      DenyList: []
+    # Allow Zitadel's outgoing HTTP calls (Actions V2 targets, IdP discovery)
+    # to reach internal/cluster-local URLs — Zitadel → API SSO group-sync
+    # webhooks call an in-cluster ClusterIP (10.0.0.0/8 on most clusters).
+    # Zitadel ≥4.15.2 routes ALL such calls through a global
+    # HTTPClient.DenyList that blocks RFC1918 + loopback by default; the older
+    # Executions.DenyList is deprecated and MERGES INTO it, so clearing only
+    # that list allows nothing (zitadel/zitadel#12326 — no allowlist exists).
+    # We therefore override the deny list itself: private/loopback entries are
+    # dropped, while the cloud-metadata (169.254.0.0/16 — AWS/GCP/Azure
+    # 169.254.169.254) and special-range guards are kept, since those are the
+    # high-value SSRF targets and are never legitimate endpoints in-cluster.
+    HTTPClient:
+      DenyList:
+        - "0.0.0.0/8"       # Unspecified IPv4 / local routing trick
+        - "100.64.0.0/10"   # Carrier-Grade NAT space
+        - "169.254.0.0/16"  # Link-local incl. cloud metadata endpoints
+        - "198.18.0.0/15"   # Benchmark ranges
+        - "::/128"          # Unspecified IPv6
+        - "fe80::/10"       # IPv6 link-local (metadata equivalent)
 
     DefaultInstance:
       LoginPolicy:
