@@ -195,6 +195,15 @@ spec:
             - name: CORS_EXTRA_ORIGINS
               value: {{ .Values.api.corsExtraOrigins | quote }}
             {{- end }}
+            # ── Client-IP attribution (#597) ──
+            # Without trusted proxies, c.ClientIP() is the ingress pod for every
+            # request: one shared per-IP rate bucket for the whole deployment and
+            # collapsed per-IP security keying. Empty value omits the env var, so
+            # the API falls back to its hardened trust-no-proxies default.
+            {{- if .Values.api.trustedProxies }}
+            - name: TRUSTED_PROXIES
+              value: {{ .Values.api.trustedProxies | quote }}
+            {{- end }}
             # ── SSO ──
             {{- if .Values.sso.enableOidcTeamSync }}
             - name: ENABLE_OIDC_TEAM_SYNC

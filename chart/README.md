@@ -272,6 +272,7 @@ The table below is generated from `values.yaml`. Boilerplate keys (resources, sc
 | api.server.readTimeout | string | `"30s"` |  |
 | api.server.writeTimeout | string | `"30s"` |  |
 | api.tolerations | list | `[]` |  |
+| api.trustedProxies | string | `"10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"` | Proxy CIDRs the API trusts for `X-Forwarded-For` client-IP attribution (comma-separated). Behind an ingress the API's direct peer is the ingress pod, so without this every request shares ONE per-IP rate-limit bucket (10 req/s on /auth for the whole deployment) and all per-IP security keying collapses to a single key. The RFC1918 default trusts any in-cluster proxy — convenient and correct for typical clusters, but any in-cluster workload could spoof X-Forwarded-For; to harden, set this to your ingress controller's pod CIDR, or to "" to trust no proxies (client IP = direct peer, restoring the shared-bucket behavior). |
 | customCA.cert | string | `""` | Inline PEM-encoded CA cert(s); the chart creates a ConfigMap from this |
 | customCA.existingConfigMap | string | `""` | Pre-existing ConfigMap holding the CA cert (ignored when `existingSecret` is set) |
 | customCA.existingSecret | string | `""` | Pre-existing Secret holding the CA cert (highest priority) |
