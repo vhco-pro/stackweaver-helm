@@ -115,6 +115,17 @@ spec:
                   name: {{ include "stackweaver.secrets.zitadel" . }}
                   key: {{ .Values.secrets.zitadel.keys.clientSecret }}
                   optional: true
+            # AUD-012 audience enforcement: real user access tokens carry the
+            # frontend PKCE client_id in `aud`, so the API must accept it or
+            # every browser-issued token is rejected with 401 (#581). Must be a
+            # secretKeyRef — zitadel-init regenerates this id on re-init, so a
+            # templated literal would break on the next bootstrap.
+            - name: ZITADEL_FRONTEND_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "stackweaver.secrets.zitadel" . }}
+                  key: {{ .Values.secrets.zitadel.keys.frontendClientId }}
+                  optional: true
             - name: ZITADEL_LOGIN_SERVICE_USER_TOKEN
               valueFrom:
                 secretKeyRef:
