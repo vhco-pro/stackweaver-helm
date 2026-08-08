@@ -55,7 +55,7 @@ spec:
             # Entra) fetch {issuer}/.well-known/openid-configuration, served only at
             # the ingress root. A missing issuer leaves this unset so the runner uses
             # its localhost default and warns loudly if an auth_method=oidc Azure
-            # workspace actually needs it — rather than minting a doomed /api/v2 token.
+            # workspace actually needs it - rather than minting a doomed /api/v2 token.
             {{- if .Values.oidc.issuerUrl }}
             - name: OIDC_ISSUER_URL
               value: {{ .Values.oidc.issuerUrl | quote }}
@@ -71,7 +71,7 @@ spec:
             # writable, so the runner installs versioned terraform binaries under
             # $HOME/.terraform-versions (core/plugins/terraform/plugin.go). The
             # default home (/home/iac) is read-only too, so point HOME at the
-            # writable /tmp emptyDir — mirrors ANSIBLE_HOME on the ansible-runner.
+            # writable /tmp emptyDir - mirrors ANSIBLE_HOME on the ansible-runner.
             - name: HOME
               value: /tmp
             # ── Workspaces ──

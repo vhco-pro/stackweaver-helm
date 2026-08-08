@@ -74,7 +74,7 @@ spec:
           env:
             - name: LOG_LEVEL
               value: info
-            # AUD-063/070: run the API in production mode so gin release-mode behaviors engage —
+            # AUD-063/070: run the API in production mode so gin release-mode behaviors engage -
             # including denying credentialed CORS to localhost origins (production uses configured
             # origins, not localhost).
             - name: GIN_MODE
@@ -118,7 +118,7 @@ spec:
             # AUD-012 audience enforcement: real user access tokens carry the
             # frontend PKCE client_id in `aud`, so the API must accept it or
             # every browser-issued token is rejected with 401 (#581). Must be a
-            # secretKeyRef — zitadel-init regenerates this id on re-init, so a
+            # secretKeyRef - zitadel-init regenerates this id on re-init, so a
             # templated literal would break on the next bootstrap.
             - name: ZITADEL_FRONTEND_CLIENT_ID
               valueFrom:

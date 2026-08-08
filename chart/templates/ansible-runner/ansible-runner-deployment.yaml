@@ -61,7 +61,7 @@ spec:
             # Entra) fetch {issuer}/.well-known/openid-configuration, served only at
             # the ingress root. A missing issuer leaves this unset so the runner uses
             # its localhost default and warns loudly if an auth_method=oidc Azure
-            # inventory actually needs it — rather than minting a doomed /api/v2 token.
+            # inventory actually needs it - rather than minting a doomed /api/v2 token.
             {{- if .Values.oidc.issuerUrl }}
             - name: OIDC_ISSUER_URL
               value: {{ .Values.oidc.issuerUrl | quote }}
@@ -92,7 +92,7 @@ spec:
             {{- end }}
           volumeMounts:
             # Per-job scratch (playbook checkout, inventory, staged credentials).
-            # Ephemeral and isolated from the terraform runner — it holds no run
+            # Ephemeral and isolated from the terraform runner - it holds no run
             # history (output/status/events live in Postgres + object storage).
             - name: workspaces
               mountPath: /home/iac/workspaces
