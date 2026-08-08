@@ -24,7 +24,7 @@ spec:
       serviceAccountName: {{ include "stackweaver.fullname" . }}-zitadel-init
       # AUD-079: run non-root. The Zitadel image ships a non-root `zitadel` user (uid/gid 1000);
       # fsGroup makes the shared /pat + /tmp emptyDir volumes group-owned and group-writable, so
-      # that user can write the admin PAT and the zitadel-init sidecar can read it — no root needed.
+      # that user can write the admin PAT and the zitadel-init sidecar can read it - no root needed.
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000

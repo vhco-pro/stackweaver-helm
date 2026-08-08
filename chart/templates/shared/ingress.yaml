@@ -32,10 +32,10 @@ spec:
                 name: {{ include "stackweaver.fullname" . }}-api
                 port:
                   number: {{ .Values.api.port }}
-          # Auth proxy (OIDC + Session API) for the custom login UI —
+          # Auth proxy (OIDC + Session API) for the custom login UI -
           # routes under /auth/* live on the API, not under /api/v2/*.
           # IMPORTANT: /auth/callback and /auth/login are SPA routes handled
-          # by the frontend React Router — they must be listed BEFORE the
+          # by the frontend React Router - they must be listed BEFORE the
           # /auth catch-all so nginx matches the longer path first.
           - path: /auth/callback
             pathType: Prefix

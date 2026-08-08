@@ -156,7 +156,7 @@ api:
   # Behind an ingress the API's direct peer is the ingress pod, so without this every request
   # shares ONE per-IP rate-limit bucket (10 req/s on /auth for the whole deployment) and all
   # per-IP security keying collapses to a single key. The RFC1918 default trusts any in-cluster
-  # proxy — convenient and correct for typical clusters, but any in-cluster workload could spoof
+  # proxy - convenient and correct for typical clusters, but any in-cluster workload could spoof
   # X-Forwarded-For; to harden, set this to your ingress controller's pod CIDR, or to "" to
   # trust no proxies (client IP = direct peer, restoring the shared-bucket behavior).
   trustedProxies: "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
@@ -265,7 +265,7 @@ runner:
 # digest (not a mutable tag) to a maintained, multi-arch kubectl image that ships a shell + the
 # coreutils the bootstrap script needs. Renovate keeps the tag+digest current (see the
 # `secrets-init kubectl image` customManager in .github/renovate.json5). Override for a private
-# mirror. (Chainguard's free `kubectl` is distroless — no shell — so it can't run this Job's script.)
+# mirror. (Chainguard's free `kubectl` is distroless - no shell - so it can't run this Job's script.)
 secretsInit:
   # renovate: datasource=docker depName=alpine/k8s
   image: alpine/k8s:1.36.2@sha256:44ef4942e171939b9c665a4a84beb80e2dcdb9a24330d4651cfdfd2e9deecc47
@@ -305,8 +305,8 @@ ansibleRunner:
   workspacesSizeLimit: 5Gi
   # Dedicated per-project Ansible Galaxy cache, mounted at
   # /home/iac/workspaces/galaxy-cache and kept off the shared runner volume.
-  # The cache is a regenerable performance optimization — collections simply
-  # re-download if it is lost — so modest sizing and ReadWriteOnce are fine.
+  # The cache is a regenerable performance optimization - collections simply
+  # re-download if it is lost - so modest sizing and ReadWriteOnce are fine.
   # Set enabled=false to fall back to an ephemeral emptyDir (cold cache on every
   # pod restart). For replicas > 1, set accessMode to ReadWriteMany.
   galaxyCache:
@@ -332,7 +332,7 @@ ansibleRunner:
   #       azure.workload.identity/client-id: <MI-CLIENT-ID>
   # Note: the SA is shared across all stackweaver pods, so the annotation applies
   # cluster-wide. Managed Identity via IMDS (auth_method: managed_identity) needs
-  # none of this — only a node/kubelet or user-assigned identity with Reader on the
+  # none of this - only a node/kubelet or user-assigned identity with Reader on the
   # target subscription.
   workloadIdentity:
     # -- Enable AKS Workload Identity for Azure dynamic-inventory sync

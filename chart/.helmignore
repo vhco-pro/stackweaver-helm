@@ -13,5 +13,5 @@
 *.tmproj
 .hg
 .svn
-# helm-docs template — build input for README.md, not a chart artifact
+# helm-docs template - build input for README.md, not a chart artifact
 README.md.gotmpl
