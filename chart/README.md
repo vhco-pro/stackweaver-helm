@@ -29,7 +29,7 @@ helm install stackweaver ./deploy/helm/stackweaver \
 ```
 
 This deploys:
-- **Core**: API, Frontend, Orchestrator, Terraform Runner, Ansible Runner
+- **Core**: API, Frontend, Orchestrator, OpenTofu Runner, Ansible Runner
 - **Dependencies**: PostgreSQL 17, Redis 8, Garage, Zitadel + Login UI
 - **Networking**: Two-domain ingress with TLS
 - **Secrets**: Auto-generated for PostgreSQL, Garage storage, encryption, and Zitadel
@@ -62,7 +62,7 @@ After install, follow the post-install notes (`helm get notes stackweaver -n sta
    ├── Redis 8        (job queue)
    ├── Garage         (S3-compatible storage)
    ├── Orchestrator   (job scheduler)
-   ├── Runner         (Terraform execution)
+   ├── Runner         (OpenTofu execution)
    └── Ansible Runner (Ansible execution)
 ```
 
@@ -173,7 +173,7 @@ The frontend reads `window.__STACKWEAVER__` from `env.js`, with fallback to Vite
 | API | `ghcr.io/vhco-pro/stackweaver-api` | `backend/Dockerfile` |
 | Frontend | `ghcr.io/vhco-pro/stackweaver-frontend` | `frontend/Dockerfile` (generic, no build args needed) |
 | Orchestrator | `ghcr.io/vhco-pro/stackweaver-orchestrator` | `backend/Dockerfile` |
-| Runner | `ghcr.io/vhco-pro/stackweaver-runner` | `backend/Dockerfile` |
+| Runner | `ghcr.io/vhco-pro/stackweaver-opentofu-runner` | `backend/Dockerfile` |
 | Ansible Runner | `ghcr.io/vhco-pro/stackweaver-ansible-runner` | `runner-images/ansible/Dockerfile` |
 | Zitadel Init | `ghcr.io/vhco-pro/stackweaver-zitadel-init` | `scripts/zitadel-init/Dockerfile` |
 
@@ -362,11 +362,11 @@ The table below is generated from `values.yaml`. Boilerplate keys (resources, sc
 | runner.affinity | object | `{}` |  |
 | runner.env | object | `{}` |  |
 | runner.image.pullPolicy | string | `"IfNotPresent"` |  |
-| runner.image.repository | string | `"ghcr.io/vhco-pro/stackweaver-runner"` | Terraform runner image repository |
-| runner.image.tag | string | `"latest"` | Terraform runner image tag |
+| runner.image.repository | string | `"ghcr.io/vhco-pro/stackweaver-opentofu-runner"` | OpenTofu runner image repository |
+| runner.image.tag | string | `"latest"` | OpenTofu runner image tag |
 | runner.nodeSelector | object | `{}` |  |
 | runner.podAnnotations | object | `{}` |  |
-| runner.replicas | int | `1` | Terraform runner replica count |
+| runner.replicas | int | `1` | OpenTofu runner replica count |
 | runner.resources.limits.cpu | string | `"1"` |  |
 | runner.resources.limits.memory | string | `"1Gi"` |  |
 | runner.resources.requests.cpu | string | `"200m"` |  |
@@ -421,6 +421,8 @@ The table below is generated from `values.yaml`. Boilerplate keys (resources, sc
 | storage.region | string | `"garage"` | S3 region (`garage` for the bundled store) |
 | storage.serviceAccountAnnotations | object | `{}` |  |
 | storage.useSSL | bool | `false` | Use TLS for S3 connections |
+| tofu.releasesUrl | string | `""` | Base URL for OpenTofu release artifacts (empty = upstream GitHub releases) |
+| tofu.versionIndexUrl | string | `""` | URL of the OpenTofu version index (empty = https://get.opentofu.org/tofu/api.json) |
 | zitadel.bundled | bool | `true` | Deploy bundled Zitadel (`false` uses `zitadel.external`) |
 | zitadel.config.accessTokenLifetime | string | `"12h"` | OIDC access token lifetime |
 | zitadel.config.idTokenLifetime | string | `"12h"` | OIDC ID token lifetime |

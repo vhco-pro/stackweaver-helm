@@ -213,6 +213,16 @@ spec:
             - name: OIDC_REMOVE_FROM_NON_SSO_TEAMS
               value: "true"
             {{- end }}
+            # ── OpenTofu binary sources ──
+            # Override for air-gapped installs that mirror OpenTofu internally.
+            {{- if .Values.tofu.releasesUrl }}
+            - name: TOFU_RELEASES_URL
+              value: {{ .Values.tofu.releasesUrl | quote }}
+            {{- end }}
+            {{- if .Values.tofu.versionIndexUrl }}
+            - name: TOFU_VERSION_INDEX_URL
+              value: {{ .Values.tofu.versionIndexUrl | quote }}
+            {{- end }}
             # ── Extra env vars (user overrides) ──
             {{- range $key, $value := .Values.api.env }}
             - name: {{ $key }}

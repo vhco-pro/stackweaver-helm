@@ -238,15 +238,15 @@ orchestrator:
   githubApp:
     id: ""
     name: ""
-# -- Terraform Runner --
+# -- OpenTofu Runner --
 runner:
   image:
-    # -- Terraform runner image repository
-    repository: ghcr.io/vhco-pro/stackweaver-runner
-    # -- Terraform runner image tag
+    # -- OpenTofu runner image repository
+    repository: ghcr.io/vhco-pro/stackweaver-opentofu-runner
+    # -- OpenTofu runner image tag
     tag: latest
     pullPolicy: IfNotPresent
-  # -- Terraform runner replica count
+  # -- OpenTofu runner replica count
   replicas: 1
   resources:
     requests:
@@ -510,6 +510,22 @@ zitadel:
     # In-cluster address for gRPC/HTTP calls (e.g. zitadel.other-namespace.svc:8080)
     # -- External Zitadel in-cluster address for gRPC/HTTP calls
     internalAddr: ""
+# ── OpenTofu Engine ───────────────────────────────────────────────────────────
+#
+# Stackweaver executes OpenTofu. Runs download the workspace's pinned version on
+# first use (the image bakes one in), verifying it against the release's
+# published SHA256SUMS.
+#
+# Air-gapped installs can point both endpoints at an internal mirror. The mirror
+# must reproduce upstream's layout exactly:
+#   <releasesUrl>/v<version>/tofu_<version>_linux_<arch>.zip
+#   <releasesUrl>/v<version>/tofu_<version>_SHA256SUMS
+# Checksum verification is always enforced and cannot be disabled.
+tofu:
+  # -- Base URL for OpenTofu release artifacts (empty = upstream GitHub releases)
+  releasesUrl: ""
+  # -- URL of the OpenTofu version index (empty = https://get.opentofu.org/tofu/api.json)
+  versionIndexUrl: ""
 # ── OIDC Workload Identity ───────────────────────────────────────────────────
 oidc:
   # Issuer URL for OIDC workload identity tokens (non-secret, can be left empty)

@@ -56,6 +56,16 @@ spec:
             - name: GITHUB_APP_PRIVATE_KEY_PATH
               value: /etc/github-app/private-key.pem
             {{- end }}
+            # ── OpenTofu binary sources ──
+            # Override for air-gapped installs that mirror OpenTofu internally.
+            {{- if .Values.tofu.releasesUrl }}
+            - name: TOFU_RELEASES_URL
+              value: {{ .Values.tofu.releasesUrl | quote }}
+            {{- end }}
+            {{- if .Values.tofu.versionIndexUrl }}
+            - name: TOFU_VERSION_INDEX_URL
+              value: {{ .Values.tofu.versionIndexUrl | quote }}
+            {{- end }}
             # ── Extra env vars (user overrides) ──
             {{- range $key, $value := .Values.orchestrator.env }}
             - name: {{ $key }}
