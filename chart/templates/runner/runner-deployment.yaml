@@ -66,12 +66,24 @@ spec:
                   name: {{ include "stackweaver.secrets.oidc" . }}
                   key: {{ .Values.secrets.oidc.keys.signingKey }}
                   optional: true
+            # ── OpenTofu binary sources ──
+            # Override for air-gapped installs that mirror the OpenTofu releases
+            # internally. The mirror must reproduce upstream's layout exactly;
+            # checksum verification against its SHA256SUMS is always enforced.
+            {{- if .Values.tofu.releasesUrl }}
+            - name: TOFU_RELEASES_URL
+              value: {{ .Values.tofu.releasesUrl | quote }}
+            {{- end }}
+            {{- if .Values.tofu.versionIndexUrl }}
+            - name: TOFU_VERSION_INDEX_URL
+              value: {{ .Values.tofu.versionIndexUrl | quote }}
+            {{- end }}
             # ── Writable HOME ──
             # With readOnlyRootFilesystem the image's /usr/local/bin isn't
-            # writable, so the runner installs versioned terraform binaries under
-            # $HOME/.terraform-versions (core/plugins/terraform/plugin.go). The
-            # default home (/home/iac) is read-only too, so point HOME at the
-            # writable /tmp emptyDir - mirrors ANSIBLE_HOME on the ansible-runner.
+            # writable, so the runner installs versioned tofu binaries under
+            # $HOME/.tofu-versions (core/tofu/binary.go). The default home
+            # (/home/iac) is read-only too, so point HOME at the writable /tmp
+            # emptyDir - mirrors ANSIBLE_HOME on the ansible-runner.
             - name: HOME
               value: /tmp
             # ── Workspaces ──
