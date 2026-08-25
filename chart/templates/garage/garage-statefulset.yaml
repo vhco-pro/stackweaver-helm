@@ -95,8 +95,11 @@ spec:
               ADMIN="http://127.0.0.1:3903"
               BUCKET="{{ .Values.storage.bucket }}"
               ZONE="dc1"
-              # 1000000000 == the `-c 1G` the CLI-based bootstrap used to pass.
-              CAPACITY=1000000000
+              # Derived from garage.storage.size, so the capacity the node advertises always
+              # matches its PVC. Only applied on a fresh cluster (layout version 0) - resizing an
+              # existing layout would trigger a rebalance and is left as a deliberate operator
+              # action.
+              CAPACITY={{ include "stackweaver.garage.capacityBytes" . }}
               BODY=/tmp/garage-api-body
               TRACE=/tmp/garage-api-trace
 
