@@ -451,6 +451,8 @@ garage:
   enabled: true
   image:
     repository: dxflrs/garage
+    # -- Garage image tag. Requires v2.0+: the garage-init sidecar bootstraps the cluster over the
+    # `/v2` admin API, which v1.x images do not serve.
     tag: v2.3.0
   storage:
     # -- Garage PVC size

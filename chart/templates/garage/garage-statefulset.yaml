@@ -80,56 +80,147 @@ spec:
             allowPrivilegeEscalation: false
           command: ["/bin/sh", "-c"]
           args:
+            # Bootstrap over Garage's admin API rather than its CLI. The CLI is not in the
+            # dxflrs/garage image (it ships a single /garage binary on scratch, with no shell to
+            # copy it out with), so the previous version downloaded it from garagehq.deuxfleurs.fr
+            # at startup - which no egress-restricted cluster can reach, leaving the StatefulSet
+            # at 1/2 forever with storage unconfigured. The admin API needs no egress, is
+            # versioned (unlike the CLI's stdout, which this used to screen-scrape), and is
+            # already enabled and authenticated in our garage.toml.
             - |
-              set -e
-              # Download Garage CLI to writable tmpdir
-              ARCH=$$(uname -m)
-              echo "Downloading Garage CLI for $${ARCH}..."
-              wget -qO /tmp/garage \
-                "https://garagehq.deuxfleurs.fr/_releases/{{ .Values.garage.image.tag }}/$${ARCH}-unknown-linux-musl/garage"
-              chmod +x /tmp/garage
-              export PATH="/tmp:$PATH"
+              set -eu
 
-              # Wait for Garage RPC to be reachable
-              echo "Waiting for Garage..."
-              until garage status 2>/dev/null | grep -qi "Hostname"; do sleep 2; done
+              # The sidecar shares the pod network namespace with the garage container, so the
+              # admin listener is on loopback.
+              ADMIN="http://127.0.0.1:3903"
+              BUCKET="{{ .Values.storage.bucket }}"
+              ZONE="dc1"
+              # 1000000000 == the `-c 1G` the CLI-based bootstrap used to pass.
+              CAPACITY=1000000000
+              BODY=/tmp/garage-api-body
+              TRACE=/tmp/garage-api-trace
+
+              # api <path> [json-body] - GET without a body, POST with one. Leaves the response
+              # body in $BODY, the headers plus any wget error in $TRACE, and the status in
+              # $STATUS. $BODY is truncated up front because busybox wget does not write the
+              # output file on a non-2xx, and a stale body from the previous call would
+              # otherwise be reported as this one's.
+              api() {
+                _path="$1"
+                _body="${2:-}"
+                : >"$BODY"
+                if [ -n "$_body" ]; then
+                  set -- --post-data "$_body" --header "Content-Type: application/json"
+                else
+                  set --
+                fi
+                wget -S -qO "$BODY" \
+                  --header "Authorization: Bearer ${GARAGE_ADMIN_TOKEN}" \
+                  "$@" "${ADMIN}${_path}" >"$TRACE" 2>&1 || true
+                STATUS=$(grep -o 'HTTP/1\.[01] [0-9][0-9][0-9]' "$TRACE" | tail -1 | cut -d' ' -f2)
+                [ -n "$STATUS" ]
+              }
+
+              # expect "<allowed codes>" <description> - fail loudly on anything else. The CLI
+              # version ended every mutation with `2>/dev/null || true`, which hid real failures
+              # as readily as the benign "already exists" ones.
+              expect() {
+                _allowed="$1"
+                _what="$2"
+                for _code in $_allowed; do
+                  [ "$STATUS" = "$_code" ] && return 0
+                done
+                echo "FATAL: ${_what} failed with HTTP ${STATUS:-<no response>}"
+                cat "$TRACE" 2>/dev/null || true
+                exit 1
+              }
+
+              # Field extraction without jq: alpine has none, and apk add needs the very egress
+              # we cannot assume. Garage pretty-prints its JSON, so no two fields share a line.
+              json_str() { grep -o "\"$1\": *\"[^\"]*\"" "$BODY" | head -1 | sed 's/.*: *"//; s/"$//'; }
+              json_num() { grep -o "\"$1\": *[0-9][0-9]*" "$BODY" | head -1 | sed 's/.*: *//'; }
+
+              # Wait for the admin API, but only for the reasons worth waiting on. A rejected
+              # token or an exhausted budget exits non-zero so the sidecar crash-loops visibly:
+              # it has no readiness probe, so a container looping forever would leave the pod
+              # reporting healthy with storage unconfigured.
+              echo "Waiting for the Garage admin API..."
+              ATTEMPTS=0
+              while :; do
+                if api /v2/GetClusterStatus; then
+                  case "$STATUS" in
+                    200) break ;;
+                    401 | 403)
+                      echo "FATAL: the Garage admin API rejected GARAGE_ADMIN_TOKEN (HTTP ${STATUS})"
+                      exit 1
+                      ;;
+                  esac
+                fi
+                ATTEMPTS=$((ATTEMPTS + 1))
+                if [ "$ATTEMPTS" -ge 150 ]; then
+                  echo "FATAL: the Garage admin API did not become ready within 5 minutes"
+                  echo "  last status: ${STATUS:-<no response>}"
+                  # /v2 exists from Garage v2.0 onwards; a v1.x image answers 400 here because it
+                  # only serves /v1. That is a pinned-tag problem, not a startup problem.
+                  [ "${STATUS:-}" = "400" ] && echo "  HTTP 400 usually means garage.image.tag is a v1.x release; this bootstrap requires Garage v2.0+"
+                  cat "$TRACE" 2>/dev/null || true
+                  exit 1
+                fi
+                sleep 2
+              done
               echo "Garage is ready"
 
-              # Get node ID
-              NODE_ID=$$(garage status 2>/dev/null | grep -v "^=\|^ID" | head -1 | awk '{print $$1}')
-              echo "Node ID: $${NODE_ID}"
+              NODE_ID=$(json_str id)
+              case "$NODE_ID" in
+                ????????????????????????????????????????????????????????????????) ;;
+                *) echo "FATAL: could not read a node id from GetClusterStatus"; cat "$BODY"; exit 1 ;;
+              esac
+              echo "Node ID: ${NODE_ID}"
 
-              # Assign layout if not yet configured
-              CURRENT_VER=$$(garage layout show 2>/dev/null \
-                | grep "Current cluster layout version:" | awk '{print $$NF}' || echo "0")
-              if [ "$${CURRENT_VER}" = "0" ]; then
+              LAYOUT_VERSION=$(json_num layoutVersion)
+              if [ "${LAYOUT_VERSION:-0}" = "0" ]; then
                 echo "Configuring cluster layout..."
-                garage layout assign -z dc1 -c 1G "$${NODE_ID}"
-                garage layout apply --version 1
+                api /v2/UpdateClusterLayout \
+                  "{\"roles\":[{\"id\":\"${NODE_ID}\",\"zone\":\"${ZONE}\",\"capacity\":${CAPACITY},\"tags\":[]}]}"
+                expect 200 "staging the cluster layout"
+                api /v2/ApplyClusterLayout '{"version":1}'
+                expect 200 "applying the cluster layout"
               else
-                echo "Layout already configured (version $${CURRENT_VER})"
+                echo "Layout already configured (version ${LAYOUT_VERSION})"
               fi
 
-              # Import key, create bucket, grant access (all idempotent)
+              # 409 is Garage's "already exists" on both create paths, which is the normal state
+              # on every restart after the first - tolerated, anything else aborts.
               echo "Importing access key..."
-              garage key import --yes -n stackweaver \
-                "$${STORAGE_ACCESS_KEY}" "$${STORAGE_SECRET_KEY}" 2>/dev/null || true
+              api /v2/ImportKey \
+                "{\"accessKeyId\":\"${STORAGE_ACCESS_KEY}\",\"secretAccessKey\":\"${STORAGE_SECRET_KEY}\",\"name\":\"stackweaver\"}"
+              expect "200 409" "importing the access key"
+
               echo "Creating bucket..."
-              garage bucket create {{ .Values.storage.bucket }} 2>/dev/null || true
+              api /v2/CreateBucket "{\"globalAlias\":\"${BUCKET}\"}"
+              expect "200 409" "creating bucket ${BUCKET}"
+
+              api "/v2/GetBucketInfo?globalAlias=${BUCKET}"
+              expect 200 "looking up bucket ${BUCKET}"
+              BUCKET_ID=$(json_str id)
+
               echo "Granting key access..."
-              garage bucket allow --read --write --owner \
-                {{ .Values.storage.bucket }} --key "$${STORAGE_ACCESS_KEY}" 2>/dev/null || true
+              api /v2/AllowBucketKey \
+                "{\"bucketId\":\"${BUCKET_ID}\",\"accessKeyId\":\"${STORAGE_ACCESS_KEY}\",\"permissions\":{\"read\":true,\"write\":true,\"owner\":true}}"
+              expect 200 "granting key access to bucket ${BUCKET}"
 
               echo "Garage initialized successfully"
               # Sleep forever, sidecar must stay alive or the pod enters CrashLoopBackOff.
               # Uses zero CPU (interruptible sleep). Same pattern as zitadel-init sidecar.
               exec sleep infinity
           env:
-            - name: GARAGE_RPC_SECRET
+            # Admin API only: no RPC secret, garage.toml or meta dir needed here any more, since
+            # the bootstrap no longer runs the CLI against the node's own database.
+            - name: GARAGE_ADMIN_TOKEN
               valueFrom:
                 secretKeyRef:
                   name: {{ include "stackweaver.fullname" . }}-garage
-                  key: rpc-secret
+                  key: admin-token
             - name: STORAGE_ACCESS_KEY
               valueFrom:
                 secretKeyRef:
@@ -141,12 +232,6 @@ spec:
                   name: {{ include "stackweaver.secrets.storage" . }}
                   key: {{ .Values.secrets.storage.keys.secretKey }}
           volumeMounts:
-            - name: config
-              mountPath: /etc/garage.toml
-              subPath: garage.toml
-            - name: meta
-              mountPath: /var/lib/garage/meta
-              readOnly: true
             - name: tmp
               mountPath: /tmp
           resources:

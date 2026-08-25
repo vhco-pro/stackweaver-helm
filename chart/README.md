@@ -294,7 +294,7 @@ The table below is generated from `values.yaml`. Boilerplate keys (resources, sc
 | fullnameOverride | string | `""` |  |
 | garage.enabled | bool | `true` | Deploy the bundled Garage S3 store (`false` uses external S3 via `storage.*`) |
 | garage.image.repository | string | `"dxflrs/garage"` |  |
-| garage.image.tag | string | `"v2.3.0"` |  |
+| garage.image.tag | string | `"v2.3.0"` | Garage image tag. Requires v2.0+: the garage-init sidecar bootstraps the cluster over the `/v2` admin API, which v1.x images do not serve. |
 | garage.resources.limits.cpu | string | `"500m"` |  |
 | garage.resources.limits.memory | string | `"512Mi"` |  |
 | garage.resources.requests.cpu | string | `"100m"` |  |
