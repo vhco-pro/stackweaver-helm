@@ -18,8 +18,9 @@ Access the application by port-forwarding:
 
 {{- if or (not .Values.secrets.postgresql.secretName) (not .Values.secrets.storage.secretName) (not .Values.secrets.encryption.secretName) (not .Values.secrets.zitadel.secretName) }}
 
-The chart has auto-generated secrets for components where you didn't
-provide an external secretName. They are preserved across upgrades.
+The secrets-init Job has created secrets for the components where you
+didn't provide an external secretName. It only ever creates missing
+secrets, so existing values are never regenerated on upgrade.
 
 To view a generated password:
   kubectl get secret {{ include "stackweaver.fullname" . }}-postgresql -o jsonpath='{.data.password}' | base64 -d

@@ -484,3 +484,23 @@ Include with nindent inside a volumeMounts: list.
   readOnly: true
 {{- end }}
 {{- end }}
+
+{{/*
+Whether the secrets-init bootstrap hook is needed at all.
+
+Emits "true" when at least one Secret is chart-managed, i.e. the user has not
+supplied a secretName for it (and, for storage, credential auth is in use).
+When every secret is brought by the user, neither the Job nor its RBAC is
+rendered - that makes bring-your-own an airtight, zero-image-dependency install
+path for air-gapped clusters, not just a "the Job will no-op" promise.
+*/}}
+{{- define "stackweaver.secretsInit.needed" -}}
+{{- $needed := false -}}
+{{- if not .Values.secrets.postgresql.secretName }}{{- $needed = true -}}{{- end }}
+{{- if and (not .Values.secrets.storage.secretName) (eq (.Values.storage.auth | default "credentials") "credentials") }}{{- $needed = true -}}{{- end }}
+{{- if .Values.garage.enabled }}{{- $needed = true -}}{{- end }}
+{{- if not .Values.secrets.encryption.secretName }}{{- $needed = true -}}{{- end }}
+{{- if not .Values.secrets.zitadel.secretName }}{{- $needed = true -}}{{- end }}
+{{- if not .Values.secrets.oidc.secretName }}{{- $needed = true -}}{{- end }}
+{{- if $needed }}true{{- end }}
+{{- end }}
