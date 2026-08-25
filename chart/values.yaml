@@ -62,8 +62,10 @@ ingress:
 # ── External Secrets ──────────────────────────────────────────────────────────
 #
 # For each component, you can either:
-#   1. Leave secretName empty → chart auto-generates a Secret with random values
-#      (preserved across helm upgrade via lookup). Zero config, works out of the box.
+#   1. Leave secretName empty → the secrets-init bootstrap Job (a Helm pre-install/pre-upgrade
+#      hook and an ArgoCD PreSync hook) creates the Secret with random values on first install
+#      and skips it on every later run, so values survive upgrades. Zero config, works out of
+#      the box. The chart itself never renders Secret manifests.
 #   2. Set secretName to a pre-existing K8s Secret → chart uses it as-is.
 #      Use this for production / GitOps (External Secrets Operator, Sealed Secrets, etc.).
 #
@@ -261,14 +263,22 @@ runner:
   tolerations: []
   affinity: {}
 # -- Secrets bootstrap job --
-# AUD-063: the secrets-init Job holds secret-create RBAC, so its image is pinned by immutable
-# digest (not a mutable tag) to a maintained, multi-arch kubectl image that ships a shell + the
-# coreutils the bootstrap script needs. Renovate keeps the tag+digest current (see the
-# `secrets-init kubectl image` customManager in .github/renovate.json5). Override for a private
-# mirror. (Chainguard's free `kubectl` is distroless - no shell - so it can't run this Job's script.)
+# The secrets-init hook Job creates every secret you did not supply via secrets.*.secretName.
+# It runs the first-party /secrets-init binary - stdlib-only Go on distroless, no shell, no OS
+# packages, no third-party modules - in its own single-purpose image, so the one process in the
+# release that holds secret-create RBAC carries the chart's own provenance and nothing else.
+# That supersedes the AUD-063 rationale for pinning a general-purpose kubectl image by digest
+# (that image's missing openssl CLI is what broke fresh ArgoCD installs of 0.11.3-0.12.1).
+# Override the repository for a private mirror or air-gapped registry. When every secret is
+# user-supplied the Job is not rendered at all and this image is never pulled.
 secretsInit:
-  # renovate: datasource=docker depName=alpine/k8s
-  image: alpine/k8s:1.36.2@sha256:44ef4942e171939b9c665a4a84beb80e2dcdb9a24330d4651cfdfd2e9deecc47
+  image:
+    # -- Secrets-init image repository
+    repository: ghcr.io/vhco-pro/stackweaver-secrets-init
+    # -- Secrets-init image tag
+    tag: latest
+    # -- Secrets-init image pull policy
+    pullPolicy: IfNotPresent
 
 # -- Ansible Runner --
 ansibleRunner:
