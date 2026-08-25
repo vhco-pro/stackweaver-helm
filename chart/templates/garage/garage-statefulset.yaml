@@ -84,9 +84,9 @@ spec:
             # dxflrs/garage image (it ships a single /garage binary on scratch, with no shell to
             # copy it out with), so the previous version downloaded it from garagehq.deuxfleurs.fr
             # at startup - which no egress-restricted cluster can reach, leaving the StatefulSet
-            # at 1/2 forever with storage unconfigured. The admin API needs no egress, is
-            # versioned (unlike the CLI's stdout, which this used to screen-scrape), and is
-            # already enabled and authenticated in our garage.toml.
+            # at 1/2 forever with storage unconfigured. The admin API needs no egress and is
+            # already enabled and authenticated in our garage.toml. The CLI bootstrap it replaces
+            # was otherwise working; this is about the download, not about the CLI.
             - |
               set -eu
 
