@@ -300,7 +300,7 @@ The table below is generated from `values.yaml`. Boilerplate keys (resources, sc
 | garage.resources.requests.cpu | string | `"100m"` |  |
 | garage.resources.requests.memory | string | `"256Mi"` |  |
 | garage.storage.existingClaim | string | `""` | Use a pre-existing PVC instead of provisioning one |
-| garage.storage.size | string | `"10Gi"` | Garage PVC size |
+| garage.storage.size | string | `"10Gi"` | Garage PVC size. Also becomes the capacity the node advertises in the cluster layout, which is assigned once on a fresh cluster; changing it later does not resize an existing layout. |
 | garage.storage.storageClass | string | `""` | Garage PVC storage class |
 | garage.storage.volumeName | string | `""` | Bind the new PVC to a specific pre-existing PV |
 | global.imagePullSecrets | list | `[]` |  |

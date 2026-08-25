@@ -158,6 +158,39 @@ Storage endpoint, auto-resolve for bundled Garage, use values for external.
 {{- end }}
 
 {{/*
+Garage layout capacity in bytes, derived from the PVC size so the capacity the node advertises
+cannot drift from the disk it actually has. Accepts the Kubernetes quantity suffixes (Ki/Mi/Gi/Ti
+and K/M/G/T); a bare number is treated as bytes.
+*/}}
+{{- define "stackweaver.garage.capacityBytes" -}}
+{{- $size := .Values.garage.storage.size | toString -}}
+{{- $bytes := 0 -}}
+{{- if hasSuffix "Ti" $size -}}
+{{- $bytes = mul (atoi (trimSuffix "Ti" $size)) 1099511627776 -}}
+{{- else if hasSuffix "Gi" $size -}}
+{{- $bytes = mul (atoi (trimSuffix "Gi" $size)) 1073741824 -}}
+{{- else if hasSuffix "Mi" $size -}}
+{{- $bytes = mul (atoi (trimSuffix "Mi" $size)) 1048576 -}}
+{{- else if hasSuffix "Ki" $size -}}
+{{- $bytes = mul (atoi (trimSuffix "Ki" $size)) 1024 -}}
+{{- else if hasSuffix "T" $size -}}
+{{- $bytes = mul (atoi (trimSuffix "T" $size)) 1000000000000 -}}
+{{- else if hasSuffix "G" $size -}}
+{{- $bytes = mul (atoi (trimSuffix "G" $size)) 1000000000 -}}
+{{- else if hasSuffix "M" $size -}}
+{{- $bytes = mul (atoi (trimSuffix "M" $size)) 1000000 -}}
+{{- else if hasSuffix "K" $size -}}
+{{- $bytes = mul (atoi (trimSuffix "K" $size)) 1000 -}}
+{{- else -}}
+{{- $bytes = atoi $size -}}
+{{- end -}}
+{{- if le (int64 $bytes) 0 -}}
+{{- fail (printf "garage.storage.size %q could not be parsed into a byte count for the cluster layout" $size) -}}
+{{- end -}}
+{{- $bytes -}}
+{{- end }}
+
+{{/*
 Storage useSSL, false for bundled Garage, configurable for external.
 */}}
 {{- define "stackweaver.storage.useSSL" -}}

@@ -455,7 +455,9 @@ garage:
     # `/v2` admin API, which v1.x images do not serve.
     tag: v2.3.0
   storage:
-    # -- Garage PVC size
+    # -- Garage PVC size. Also becomes the capacity the node advertises in the cluster layout,
+    # which is assigned once on a fresh cluster; changing it later does not resize an existing
+    # layout.
     size: 10Gi
     # -- Garage PVC storage class
     storageClass: ""
