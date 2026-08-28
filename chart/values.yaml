@@ -306,15 +306,15 @@ ansibleRunner:
   # sockets). Bounds ephemeral disk use under the read-only root filesystem.
   # -- Size limit for the writable `/tmp` emptyDir (Ansible local temp, SSH control sockets)
   tmpSizeLimit: 1Gi
-  # Size limit for the per-job scratch emptyDir mounted at /home/iac/workspaces
+  # Size limit for the per-job scratch emptyDir mounted at /home/stackweaver/workspaces
   # (playbook checkout, inventory, staged credentials, Galaxy install staging).
   # Cleaned per job and isolated from the terraform runner's volume; it holds no
   # run history (output/status/events live in Postgres + object storage), so an
   # emptyDir is safe and survives nothing it needs to.
-  # -- Size limit for the per-job scratch emptyDir at `/home/iac/workspaces`
+  # -- Size limit for the per-job scratch emptyDir at `/home/stackweaver/workspaces`
   workspacesSizeLimit: 5Gi
   # Dedicated per-project Ansible Galaxy cache, mounted at
-  # /home/iac/workspaces/galaxy-cache and kept off the shared runner volume.
+  # /home/stackweaver/workspaces/galaxy-cache and kept off the shared runner volume.
   # The cache is a regenerable performance optimization - collections simply
   # re-download if it is lost - so modest sizing and ReadWriteOnce are fine.
   # Set enabled=false to fall back to an ephemeral emptyDir (cold cache on every

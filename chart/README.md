@@ -249,7 +249,7 @@ The table below is generated from `values.yaml`. Boilerplate keys (resources, sc
 | ansibleRunner.tmpSizeLimit | string | `"1Gi"` | Size limit for the writable `/tmp` emptyDir (Ansible local temp, SSH control sockets) |
 | ansibleRunner.tolerations | list | `[]` |  |
 | ansibleRunner.workloadIdentity.enabled | bool | `false` | Enable AKS Workload Identity for Azure dynamic-inventory sync |
-| ansibleRunner.workspacesSizeLimit | string | `"5Gi"` | Size limit for the per-job scratch emptyDir at `/home/iac/workspaces` |
+| ansibleRunner.workspacesSizeLimit | string | `"5Gi"` | Size limit for the per-job scratch emptyDir at `/home/stackweaver/workspaces` |
 | api.affinity | object | `{}` |  |
 | api.auth.autoSubmitCode | bool | `false` | Auto-submit OTP forms when the full code is pasted |
 | api.auth.notificationMode | string | `"return_code"` | Auth code delivery: `return_code` (inline, no SMTP) or `email` (via Zitadel SMTP) |

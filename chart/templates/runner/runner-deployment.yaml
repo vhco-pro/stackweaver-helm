@@ -82,13 +82,13 @@ spec:
             # With readOnlyRootFilesystem the image's /usr/local/bin isn't
             # writable, so the runner installs versioned tofu binaries under
             # $HOME/.tofu-versions (core/tofu/binary.go). The default home
-            # (/home/iac) is read-only too, so point HOME at the writable /tmp
+            # (/home/stackweaver) is read-only too, so point HOME at the writable /tmp
             # emptyDir - mirrors ANSIBLE_HOME on the ansible-runner.
             - name: HOME
               value: /tmp
             # ── Workspaces ──
             - name: WORKSPACES_DIR
-              value: /home/iac/workspaces
+              value: /home/stackweaver/workspaces
             # ── Extra env vars (user overrides) ──
             {{- range $key, $value := .Values.runner.env }}
             - name: {{ $key }}
@@ -96,7 +96,7 @@ spec:
             {{- end }}
           volumeMounts:
             - name: workspaces
-              mountPath: /home/iac/workspaces
+              mountPath: /home/stackweaver/workspaces
             - name: tmp
               mountPath: /tmp
             {{- include "stackweaver.customCA.volumeMount" . | nindent 12 }}

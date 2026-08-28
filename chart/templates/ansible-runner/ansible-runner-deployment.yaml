@@ -74,7 +74,7 @@ spec:
                   optional: true
             # ── Workspaces ──
             - name: WORKSPACES_DIR
-              value: /home/iac/workspaces
+              value: /home/stackweaver/workspaces
             # ── Ansible ──
             # Default home under the writable /tmp emptyDir so Ansible can create
             # its local temp dir under the read-only root filesystem. The runner
@@ -95,12 +95,12 @@ spec:
             # Ephemeral and isolated from the terraform runner - it holds no run
             # history (output/status/events live in Postgres + object storage).
             - name: workspaces
-              mountPath: /home/iac/workspaces
+              mountPath: /home/stackweaver/workspaces
             # Dedicated per-project Ansible Galaxy cache, nested under the scratch
             # mount at the path the runner derives (WORKSPACES_DIR/galaxy-cache).
             # A regenerable performance cache, kept off the shared runner volume.
             - name: galaxy-cache
-              mountPath: /home/iac/workspaces/galaxy-cache
+              mountPath: /home/stackweaver/workspaces/galaxy-cache
             - name: tmp
               mountPath: /tmp
             {{- include "stackweaver.customCA.volumeMount" . | nindent 12 }}
