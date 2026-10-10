@@ -134,7 +134,7 @@ spec:
                   optional: true
             # ── Auth proxy config (custom login UI, replaces zitadel-login container) ──
             - name: STACKWEAVER_NOTIFICATION_MODE
-              value: {{ .Values.api.auth.notificationMode | default "return_code" | quote }}
+              value: {{ .Values.api.auth.notificationMode | default "email" | quote }}
             - name: STACKWEAVER_DEFAULT_REDIRECT_URI
               value: {{ include "stackweaver.frontend.redirectURI" . | quote }}
             - name: STACKWEAVER_AUTO_SUBMIT_CODE

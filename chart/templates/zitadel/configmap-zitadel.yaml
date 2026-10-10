@@ -62,6 +62,10 @@ data:
       LoginPolicy:
         AllowUsernamePassword: true
         AllowExternalIDPs: true
+        # A new instance starts with registration closed; the reconcile Job opens it only
+        # when mail can be delivered and signup.selfRegistration is true (#829). Applies at
+        # instance creation only.
+        AllowRegister: false
       Org:
         LoginPolicy:
           AllowUsernamePassword: true

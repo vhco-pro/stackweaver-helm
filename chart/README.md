@@ -252,7 +252,7 @@ The table below is generated from `values.yaml`. Boilerplate keys (resources, sc
 | ansibleRunner.workspacesSizeLimit | string | `"5Gi"` | Size limit for the per-job scratch emptyDir at `/home/stackweaver/workspaces` |
 | api.affinity | object | `{}` |  |
 | api.auth.autoSubmitCode | bool | `false` | Auto-submit OTP forms when the full code is pasted |
-| api.auth.notificationMode | string | `"return_code"` | Auth code delivery: `return_code` (inline, no SMTP) or `email` (via Zitadel SMTP) |
+| api.auth.notificationMode | string | `"email"` | Auth code delivery: `email` (Zitadel delivers codes; the only production value) |
 | api.corsExtraOrigins | string | `""` | Additional CORS allowed origins (comma-separated) |
 | api.env | object | `{}` |  |
 | api.githubApp.id | string | `""` | GitHub App ID (non-secret) |
@@ -391,6 +391,7 @@ The table below is generated from `values.yaml`. Boilerplate keys (resources, sc
 | secrets.storage.keys.secretKey | string | `"secret-key"` |  |
 | secrets.storage.secretName | string | `""` | External S3/storage credentials secret name; empty + bundled Garage auto-generates |
 | secrets.zitadel.keys.adminPassword | string | `"admin-password"` |  |
+| secrets.zitadel.keys.adminPat | string | `"admin-pat"` |  |
 | secrets.zitadel.keys.adminUsername | string | `"admin-username"` |  |
 | secrets.zitadel.keys.clientId | string | `"client-id"` |  |
 | secrets.zitadel.keys.clientSecret | string | `"client-secret"` |  |
@@ -406,8 +407,17 @@ The table below is generated from `values.yaml`. Boilerplate keys (resources, sc
 | serviceAccount.annotations | object | `{}` |  |
 | serviceAccount.create | bool | `true` |  |
 | serviceAccount.name | string | `""` |  |
+| signup.selfRegistration | bool | `false` | Allow anyone to create an account. Takes effect only when `smtp.host` is set, because new accounts must verify their email. |
+| smtp.host | string | `""` | SMTP submission server as `host:port` (empty: no email delivery) |
+| smtp.keys.password | string | `"smtp-password"` | Key of the SMTP password inside `smtp.secretName` |
+| smtp.secretName | string | `""` | Pre-existing Secret holding the SMTP password (read by the reconcile Job only) |
+| smtp.senderAddress | string | `""` | From address, for example `noreply@mail.example.com` (required with `host`) |
+| smtp.senderName | string | `"Stackweaver"` | From display name |
+| smtp.tls | bool | `true` | Use TLS for the SMTP connection |
+| smtp.user | string | `""` | SMTP username (empty: no authentication) |
+| sso.azureAd.allowMultiTenant | bool | `false` | Allow any Microsoft account (the multi-tenant "common" tenant) to sign in and create an account |
 | sso.azureAd.clientId | string | `""` | Azure AD / Entra ID application (client) ID |
-| sso.azureAd.tenantId | string | `""` | Azure AD / Entra ID directory (tenant) ID |
+| sso.azureAd.tenantId | string | `""` | Azure AD / Entra ID directory (tenant) ID (required unless `allowMultiTenant` is true) |
 | sso.enableOidcTeamSync | bool | `false` | Sync team membership from OIDC claims on login |
 | sso.keys.azureAdClientSecret | string | `"azure-ad-client-secret"` |  |
 | sso.keys.oidcProviderClientSecret | string | `"oidc-idp-client-secret"` |  |

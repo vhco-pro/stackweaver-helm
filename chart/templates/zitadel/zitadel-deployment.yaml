@@ -189,6 +189,8 @@ spec:
               value: {{ .Values.secrets.zitadel.keys.webhookIdpSyncKey }}
             - name: K8S_KEY_WEBHOOK_COMPLEMENT_TOKEN_KEY
               value: {{ .Values.secrets.zitadel.keys.webhookComplementTokenKey }}
+            - name: K8S_KEY_ADMIN_PAT
+              value: {{ .Values.secrets.zitadel.keys.adminPat }}
             # ── Actions V2 API base URL ──
             # Zitadel Actions V2 webhooks call the API to sync IdP claims.
             # In Kubernetes the API runs in a separate pod, so we use the
@@ -203,6 +205,8 @@ spec:
             - name: AZURE_AD_TENANT_ID
               value: {{ .Values.sso.azureAd.tenantId | quote }}
             {{- end }}
+            - name: AZURE_AD_ALLOW_MULTI_TENANT
+              value: {{ .Values.sso.azureAd.allowMultiTenant | default false | quote }}
             {{- if .Values.sso.secretName }}
             - name: AZURE_AD_CLIENT_SECRET
               valueFrom:
