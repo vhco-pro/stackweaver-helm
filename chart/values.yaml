@@ -120,6 +120,7 @@ secrets:
       frontendClientId: frontend-client-id
       webhookIdpSyncKey: webhook-idp-sync-key
       webhookComplementTokenKey: webhook-complement-token-key
+      adminPat: admin-pat
   # OIDC workload identity signing key (optional, for Azure OIDC / inventory sync)
   # When secretName is empty, the chart auto-generates an RSA key pair.
   oidc:
@@ -164,10 +165,12 @@ api:
   trustedProxies: "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
   # Auth proxy (custom login UI), replaces the standalone zitadel-login container.
   auth:
-    # return_code = codes returned inline (homelab / dev default, no SMTP needed).
-    # email       = codes delivered via Zitadel's configured SMTP provider.
-    # -- Auth code delivery: `return_code` (inline, no SMTP) or `email` (via Zitadel SMTP)
-    notificationMode: return_code
+    # email       = codes are delivered only by Zitadel, through the SMTP provider configured in
+    #               `smtp.*`. Without SMTP, flows that need mail are switched off instead.
+    # return_code = development only: codes are returned to the browser. The API refuses to
+    #               start with it, because the chart runs the API with GIN_MODE=release.
+    # -- Auth code delivery: `email` (Zitadel delivers codes; the only production value)
+    notificationMode: email
     # Auto-submit OTP forms when the full code is pasted (UX nicety, off by default).
     # -- Auto-submit OTP forms when the full code is pasted
     autoSubmitCode: false
@@ -563,8 +566,10 @@ sso:
   azureAd:
     # -- Azure AD / Entra ID application (client) ID
     clientId: ""
-    # -- Azure AD / Entra ID directory (tenant) ID
+    # -- Azure AD / Entra ID directory (tenant) ID (required unless `allowMultiTenant` is true)
     tenantId: ""
+    # -- Allow any Microsoft account (the multi-tenant "common" tenant) to sign in and create an account
+    allowMultiTenant: false
   # Generic OIDC provider (Okta, AWS Cognito, Keycloak, etc.)
   oidcProvider:
     # -- Display name on the login button (e.g. "Okta", "AWS Cognito")
@@ -582,6 +587,35 @@ sso:
   keys:
     azureAdClientSecret: azure-ad-client-secret
     oidcProviderClientSecret: oidc-idp-client-secret
+# ── Identity mail (SMTP) ──────────────────────────────────────────────────────
+#
+# Zitadel sends verification, password-reset and email login codes through this
+# SMTP provider. A post-install/post-upgrade Job configures it in the bundled
+# Zitadel (it does nothing with an external Zitadel). Without `smtp.host`,
+# self-registration, self-service password reset and email codes are switched
+# off. Any transactional provider with SMTP submission works; the sending
+# domain needs SPF, DKIM and DMARC records.
+smtp:
+  # -- SMTP submission server as `host:port` (empty: no email delivery)
+  host: ""
+  # -- SMTP username (empty: no authentication)
+  user: ""
+  # -- From address, for example `noreply@mail.example.com` (required with `host`)
+  senderAddress: ""
+  # -- From display name
+  senderName: "Stackweaver"
+  # -- Use TLS for the SMTP connection
+  tls: true
+  # -- Pre-existing Secret holding the SMTP password (read by the reconcile Job only)
+  secretName: ""
+  keys:
+    # -- Key of the SMTP password inside `smtp.secretName`
+    password: smtp-password
+# ── Signup ────────────────────────────────────────────────────────────────────
+signup:
+  # -- Allow anyone to create an account. Takes effect only when `smtp.host` is set,
+  # because new accounts must verify their email.
+  selfRegistration: false
 # ── Custom CA Certificates ─────────────────────────────────────────────────
 #
 # Mount a custom CA certificate bundle into all Go service containers.

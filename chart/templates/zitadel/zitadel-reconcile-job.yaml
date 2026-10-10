@@ -1,0 +1,88 @@
+{{/* ── Identity-mail reconcile Job (#829) ──────────────────────────────── */}}
+{{/* Applies the SMTP provider, mail capability and the mail-dependent login  */}}
+{{/* policy to the bundled Zitadel after every install and upgrade. It runs   */}}
+{{/* as a Job, not in the zitadel-init sidecar: a crash loop in the sidecar   */}}
+{{/* would mark the whole Zitadel pod NotReady and stop every login, while a  */}}
+{{/* failed Job fails the deploy and leaves Zitadel serving with the previous */}}
+{{/* settings. It needs no Kubernetes API access: the admin PAT, which the    */}}
+{{/* sidecar stores after its first run, arrives through a secretKeyRef, and  */}}
+{{/* the kubelet keeps retrying until that key exists. Mirrors the hook,      */}}
+{{/* delete-policy and TTL settings of secrets-init-job.yaml.                 */}}
+{{- if .Values.zitadel.bundled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "stackweaver.fullname" . }}-zitadel-reconcile
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "stackweaver.labels" . | nindent 4 }}
+    app.kubernetes.io/component: zitadel-reconcile
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "0"
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  ttlSecondsAfterFinished: 3600
+  backoffLimit: 6
+  # Below the documented `helm --timeout 10m`; covers a fresh install, where the Job can start
+  # before Zitadel is up and before the sidecar has stored the admin PAT.
+  activeDeadlineSeconds: 480
+  template:
+    metadata:
+      labels:
+        {{- include "stackweaver.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: zitadel-reconcile
+    spec:
+      {{- include "stackweaver.imagePullSecrets" . | nindent 6 }}
+      restartPolicy: OnFailure
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+      containers:
+        - name: zitadel-reconcile
+          image: "{{ .Values.zitadel.init.image.repository }}:{{ .Values.zitadel.init.image.tag }}"
+          imagePullPolicy: {{ .Values.zitadel.init.image.pullPolicy }}
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+          resources:
+            {{- toYaml .Values.zitadel.init.resources | nindent 12 }}
+          env:
+            - name: ZITADEL_INIT_MODE
+              value: "reconcile"
+            - name: ZITADEL_INTERNAL_ADDR
+              value: "{{ include "stackweaver.fullname" . }}-zitadel:8080"
+            - name: ZITADEL_DOMAIN
+              value: {{ .Values.zitadel.config.ExternalDomain | default .Values.ingress.hosts.auth | quote }}
+            - name: ZITADEL_PAT
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "stackweaver.secrets.zitadel" . }}
+                  key: {{ .Values.secrets.zitadel.keys.adminPat }}
+            - name: STACKWEAVER_NOTIFICATION_MODE
+              value: {{ .Values.api.auth.notificationMode | default "email" | quote }}
+            - name: STACKWEAVER_SELF_REGISTRATION
+              value: {{ .Values.signup.selfRegistration | quote }}
+            {{- if .Values.smtp.host }}
+            - name: SMTP_HOST
+              value: {{ .Values.smtp.host | quote }}
+            - name: SMTP_USER
+              value: {{ .Values.smtp.user | quote }}
+            - name: SMTP_SENDER_ADDRESS
+              value: {{ .Values.smtp.senderAddress | quote }}
+            - name: SMTP_SENDER_NAME
+              value: {{ .Values.smtp.senderName | quote }}
+            - name: SMTP_TLS
+              value: {{ .Values.smtp.tls | quote }}
+            {{- if .Values.smtp.secretName }}
+            - name: SMTP_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.smtp.secretName }}
+                  key: {{ .Values.smtp.keys.password }}
+            {{- end }}
+            {{- end }}
+{{- end }}
