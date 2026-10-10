@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="https://sw.vhco.pro/logo.png" alt="Stackweaver" width="150" />
+<img src="https://raw.githubusercontent.com/vhco-pro/.github/main/profile/assets/stackweaver.png" alt="Stackweaver" width="150" />
 
 # Stackweaver Helm Chart
 
@@ -8,13 +8,13 @@
 [![Latest Release](https://img.shields.io/github/v/release/vhco-pro/stackweaver-helm?sort=semver)](https://github.com/vhco-pro/stackweaver-helm/releases/latest)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/vhco-pro/stackweaver-helm/badge)](https://scorecard.dev/viewer/?uri=github.com/vhco-pro/stackweaver-helm)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
-[![Docs](https://img.shields.io/badge/docs-sw.vhco.pro-0ea5e9)](https://sw.vhco.pro/docs)
+[![Docs](https://img.shields.io/badge/docs-stackweaver.sh-0ea5e9)](https://stackweaver.sh/docs)
 
-Helm chart for deploying [Stackweaver](https://sw.vhco.pro) on Kubernetes.
+Helm chart for deploying [Stackweaver](https://stackweaver.sh) on Kubernetes.
 
 </div>
 
-This is the public release repository for the Stackweaver Helm chart. It is published from the Stackweaver source tree on every release. See the [release sync architecture](https://sw.vhco.pro/docs/security/sync-architecture) for how releases are built, signed, and mirrored here.
+This is the public release repository for the Stackweaver Helm chart. It is published from the Stackweaver source tree on every release. See the [release sync architecture](https://stackweaver.sh/docs/security/sync-architecture) for how releases are built, signed, and mirrored here.
 
 ## Installation
 
@@ -44,7 +44,7 @@ cosign verify \
   ghcr.io/vhco-pro/charts/stackweaver:<chart-version>
 ```
 
-The full verification guide including SBOM extraction, SLSA provenance (live after the Wave-6 visibility flip), and `gitsign verify` for sync commits lives at <https://sw.vhco.pro/docs/security/verifying-releases>.
+The full verification guide including SBOM extraction, SLSA provenance (live after the Wave-6 visibility flip), and `gitsign verify` for sync commits lives at <https://stackweaver.sh/docs/security/verifying-releases>.
 
 ## Trademark
 
