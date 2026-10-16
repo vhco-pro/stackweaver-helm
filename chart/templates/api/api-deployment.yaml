@@ -178,6 +178,16 @@ spec:
                   name: {{ .Values.secrets.githubApp.secretName }}
                   key: {{ .Values.secrets.githubApp.keys.webhookSecret }}
                   optional: true
+            # OAuth client of the App: connecting an installation asks the person to authorize
+            # the App, which confirms they can access the installation.
+            - name: GITHUB_APP_CLIENT_ID
+              value: {{ .Values.api.githubApp.clientId | quote }}
+            - name: GITHUB_APP_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.githubApp.secretName }}
+                  key: {{ .Values.secrets.githubApp.keys.clientSecret }}
+                  optional: true
             {{- end }}
             # ── OIDC Workload Identity ──
             {{- if .Values.oidc.issuerUrl }}

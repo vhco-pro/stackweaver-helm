@@ -130,11 +130,14 @@ secrets:
       signingKey: signing-key
   # GitHub App credentials (optional, for GitHub VCS integration)
   githubApp:
-    # -- GitHub App credentials secret name (private key + webhook secret)
+    # -- GitHub App credentials secret name (private key, webhook secret, OAuth client secret)
     secretName: ""
     keys:
       privateKey: private-key
       webhookSecret: webhook-secret
+      # -- Key holding the GitHub App's OAuth client secret. Connecting an installation asks the
+      # person to authorize the App and needs it, together with api.githubApp.clientId.
+      clientSecret: client-secret
 # ── Core Components ───────────────────────────────────────────────────────────
 
 # -- API (Go backend, port 8022) --
@@ -194,6 +197,10 @@ api:
     id: ""
     # -- GitHub App slug/name (non-secret)
     name: ""
+    # -- GitHub App OAuth client ID (non-secret, "Client ID" on the App's settings page). Connecting
+    # an installation asks the person to authorize the App and needs it, together with the client
+    # secret in secrets.githubApp.
+    clientId: ""
 # -- Frontend (Chainguard nginx SPA, port 8080, non-root) --
 frontend:
   image:
