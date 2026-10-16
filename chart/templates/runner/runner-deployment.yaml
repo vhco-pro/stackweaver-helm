@@ -94,6 +94,11 @@ spec:
             - name: {{ $key }}
               value: {{ $value | quote }}
             {{- end }}
+            # ── Runner variables handed to runs beyond the built-in allowlist ──
+            {{- with .Values.runner.runEnvPassthrough }}
+            - name: STACKWEAVER_RUN_ENV_PASSTHROUGH
+              value: {{ join "," . | quote }}
+            {{- end }}
           volumeMounts:
             - name: workspaces
               mountPath: /home/stackweaver/workspaces

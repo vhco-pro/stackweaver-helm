@@ -90,6 +90,11 @@ spec:
             - name: {{ $key }}
               value: {{ $value | quote }}
             {{- end }}
+            # ── Runner variables handed to jobs and syncs beyond the built-in allowlist ──
+            {{- with .Values.ansibleRunner.runEnvPassthrough }}
+            - name: STACKWEAVER_RUN_ENV_PASSTHROUGH
+              value: {{ join "," . | quote }}
+            {{- end }}
           volumeMounts:
             # Per-job scratch (playbook checkout, inventory, staged credentials).
             # Ephemeral and isolated from the terraform runner - it holds no run

@@ -247,6 +247,7 @@ The table below is generated from `values.yaml`. Boilerplate keys (resources, sc
 | ansibleRunner.resources.limits.memory | string | `"1Gi"` |  |
 | ansibleRunner.resources.requests.cpu | string | `"200m"` |  |
 | ansibleRunner.resources.requests.memory | string | `"256Mi"` |  |
+| ansibleRunner.runEnvPassthrough | list | `[]` | Names of extra runner variables (from `ansibleRunner.env`) to hand to Ansible jobs and syncs |
 | ansibleRunner.tmpSizeLimit | string | `"1Gi"` | Size limit for the writable `/tmp` emptyDir (Ansible local temp, SSH control sockets) |
 | ansibleRunner.tolerations | list | `[]` |  |
 | ansibleRunner.workloadIdentity.enabled | bool | `false` | Enable AKS Workload Identity for Azure dynamic-inventory sync |
@@ -373,6 +374,7 @@ The table below is generated from `values.yaml`. Boilerplate keys (resources, sc
 | runner.resources.limits.memory | string | `"1Gi"` |  |
 | runner.resources.requests.cpu | string | `"200m"` |  |
 | runner.resources.requests.memory | string | `"256Mi"` |  |
+| runner.runEnvPassthrough | list | `[]` | Names of extra runner variables (from `runner.env`) to hand to OpenTofu runs |
 | runner.tolerations | list | `[]` |  |
 | runnerWorkspaces.accessMode | string | `"ReadWriteMany"` | Runner workspaces PVC access mode |
 | runnerWorkspaces.existingClaim | string | `""` | Use a pre-existing PVC instead of provisioning one |
