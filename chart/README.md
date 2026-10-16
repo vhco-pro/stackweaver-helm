@@ -218,9 +218,10 @@ api:
   githubApp:
     id: "123456"
     name: my-github-app
+    clientId: Iv23liExampleClientId
 ```
 
-The GitHub App private key and webhook secret are provided via a pre-existing Secret referenced by `secrets.githubApp.secretName`.
+The GitHub App private key, webhook secret and OAuth client secret are provided via a pre-existing Secret referenced by `secrets.githubApp.secretName` (keys `private-key`, `webhook-secret` and `client-secret` by default). Connecting a GitHub App installation asks the person to authorize the App, so it needs the client ID and secret, and `<app URL>/vcs/github/authorized` must be registered as a Callback URL of the App.
 
 ## Configuration Reference
 
@@ -255,6 +256,7 @@ The table below is generated from `values.yaml`. Boilerplate keys (resources, sc
 | api.auth.notificationMode | string | `"email"` | Auth code delivery: `email` (Zitadel delivers codes; the only production value) |
 | api.corsExtraOrigins | string | `""` | Additional CORS allowed origins (comma-separated) |
 | api.env | object | `{}` |  |
+| api.githubApp.clientId | string | `""` | GitHub App OAuth client ID (non-secret, "Client ID" on the App's settings page). Connecting an installation asks the person to authorize the App and needs it, together with the client secret in secrets.githubApp. |
 | api.githubApp.id | string | `""` | GitHub App ID (non-secret) |
 | api.githubApp.name | string | `""` | GitHub App slug/name (non-secret) |
 | api.image.pullPolicy | string | `"IfNotPresent"` |  |
@@ -378,9 +380,10 @@ The table below is generated from `values.yaml`. Boilerplate keys (resources, sc
 | runnerWorkspaces.storageClass | string | `""` | Runner workspaces PVC storage class |
 | secrets.encryption.keys.key | string | `"encryption-key"` |  |
 | secrets.encryption.secretName | string | `""` | External encryption-key secret name; empty auto-generates a 32-byte hex key |
+| secrets.githubApp.keys.clientSecret | string | `"client-secret"` | Key holding the GitHub App's OAuth client secret. Connecting an installation asks the person to authorize the App and needs it, together with api.githubApp.clientId. |
 | secrets.githubApp.keys.privateKey | string | `"private-key"` |  |
 | secrets.githubApp.keys.webhookSecret | string | `"webhook-secret"` |  |
-| secrets.githubApp.secretName | string | `""` | GitHub App credentials secret name (private key + webhook secret) |
+| secrets.githubApp.secretName | string | `""` | GitHub App credentials secret name (private key, webhook secret, OAuth client secret) |
 | secrets.oidc.keys.signingKey | string | `"signing-key"` |  |
 | secrets.oidc.secretName | string | `""` | External OIDC workload-identity signing-key secret; empty auto-generates an RSA key pair |
 | secrets.postgresql.keys.password | string | `"password"` |  |
