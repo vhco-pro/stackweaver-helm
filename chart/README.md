@@ -441,7 +441,7 @@ The table below is generated from `values.yaml`. Boilerplate keys (resources, sc
 | tofu.releasesUrl | string | `""` | Base URL for OpenTofu release artifacts (empty = upstream GitHub releases) |
 | tofu.versionIndexUrl | string | `""` | URL of the OpenTofu version index (empty = https://get.opentofu.org/tofu/api.json) |
 | zitadel.bundled | bool | `true` | Deploy bundled Zitadel (`false` uses `zitadel.external`) |
-| zitadel.config.accessTokenLifetime | string | `"12h"` | OIDC access token lifetime |
+| zitadel.config.accessTokenLifetime | string | `"1h"` | OIDC access token lifetime. Seeds a new instance and is re-applied to an existing one by the reconcile Job on every install and upgrade (bundled Zitadel only) |
 | zitadel.config.idTokenLifetime | string | `"12h"` | OIDC ID token lifetime |
 | zitadel.config.refreshTokenExpiration | string | `"2160h"` | Refresh token absolute expiration |
 | zitadel.config.refreshTokenIdleExpiration | string | `"720h"` | Refresh token idle expiration |
