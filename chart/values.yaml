@@ -510,8 +510,9 @@ zitadel:
       cpu: "2"
       memory: 1Gi
   config:
-    # -- OIDC access token lifetime
-    accessTokenLifetime: 12h
+    # -- OIDC access token lifetime. Seeds a new instance and is re-applied to an existing one by the
+    # reconcile Job on every install and upgrade (bundled Zitadel only)
+    accessTokenLifetime: 1h
     # -- OIDC ID token lifetime
     idTokenLifetime: 12h
     # -- Refresh token idle expiration

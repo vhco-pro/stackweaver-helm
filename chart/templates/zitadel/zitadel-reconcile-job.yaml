@@ -66,6 +66,8 @@ spec:
               value: {{ .Values.api.auth.notificationMode | default "email" | quote }}
             - name: STACKWEAVER_SELF_REGISTRATION
               value: {{ .Values.signup.selfRegistration | quote }}
+            - name: ZITADEL_ACCESS_TOKEN_LIFETIME
+              value: {{ .Values.zitadel.config.accessTokenLifetime | default "1h" | quote }}
             {{- if .Values.smtp.host }}
             - name: SMTP_HOST
               value: {{ .Values.smtp.host | quote }}

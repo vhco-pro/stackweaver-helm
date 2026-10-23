@@ -75,7 +75,7 @@ data:
           Required: true
           BaseURI: {{ include "stackweaver.loginUI.baseURL" . }}
       OIDCSettings:
-        AccessTokenLifetime: {{ .Values.zitadel.config.accessTokenLifetime | default "12h" }}
+        AccessTokenLifetime: {{ .Values.zitadel.config.accessTokenLifetime | default "1h" }}
         IdTokenLifetime: {{ .Values.zitadel.config.idTokenLifetime | default "12h" }}
         RefreshTokenIdleExpiration: {{ .Values.zitadel.config.refreshTokenIdleExpiration | default "720h" }}
         RefreshTokenExpiration: {{ .Values.zitadel.config.refreshTokenExpiration | default "2160h" }}
