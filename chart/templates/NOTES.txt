@@ -44,4 +44,7 @@ No manual steps are required. To monitor progress:
   kubectl logs -f job/{{ include "stackweaver.fullname" . }}-zitadel-init
 {{- end }}
 
+Platform administrators are set by `platform.admins` (by default the bundled
+Zitadel's bootstrap admin); they manage the installation under Settings, Platform.
+
 For documentation: https://github.com/stackweaver/stackweaver

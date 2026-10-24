@@ -223,6 +223,22 @@ spec:
             - name: OIDC_REMOVE_FROM_NON_SSO_TEAMS
               value: "true"
             {{- end }}
+            # ── Platform administration ──
+            # The declared platform administrators: the explicit list, or else the bundled
+            # Zitadel's bootstrap admin, whose email the API matches at sign-in. An external
+            # Zitadel has no bootstrap human the chart knows about.
+            {{- with .Values.platform.admins }}
+            - name: STACKWEAVER_PLATFORM_ADMINS
+              value: {{ join "," . | quote }}
+            {{- end }}
+            {{- if .Values.zitadel.bundled }}
+            - name: ZITADEL_ADMIN_USERNAME
+              value: {{ .Values.zitadel.init.adminUsername | quote }}
+            {{- end }}
+            {{- if and .Values.platform.organizationCreation (ne .Values.platform.organizationCreation "everyone") }}
+            - name: STACKWEAVER_ORGANIZATION_CREATION
+              value: {{ .Values.platform.organizationCreation | quote }}
+            {{- end }}
             # ── OpenTofu binary sources ──
             # Override for air-gapped installs that mirror OpenTofu internally.
             {{- if .Values.tofu.releasesUrl }}

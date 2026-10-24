@@ -335,6 +335,8 @@ The table below is generated from `values.yaml`. Boilerplate keys (resources, sc
 | orchestrator.resources.requests.cpu | string | `"100m"` |  |
 | orchestrator.resources.requests.memory | string | `"128Mi"` |  |
 | orchestrator.tolerations | list | `[]` |  |
+| platform.admins | list | `[]` | Email addresses of the deployment-declared platform administrators. Empty means the bundled Zitadel's `zitadel.init.adminUsername`; with an external Zitadel (`zitadel.bundled: false`) set this, or nobody is a platform administrator. A declared administrator cannot be removed from inside Stackweaver. Declare only addresses you control at every identity provider this installation signs people in with. |
+| platform.organizationCreation | string | `"everyone"` | Who may create organizations: `everyone` or `platform-admins` |
 | postgresql.auth.database | string | `"iac_platform"` | Bundled PostgreSQL database name |
 | postgresql.auth.username | string | `"iac"` | Bundled PostgreSQL username |
 | postgresql.enabled | bool | `true` | Deploy bundled PostgreSQL (`false` uses `postgresql.external`) |
