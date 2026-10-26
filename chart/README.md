@@ -161,8 +161,7 @@ The frontend image is **generic** - no domain-specific build args are needed. Th
 | Variable | Source |
 |---|---|
 | `VITE_API_URL` | `https://<ingress.hosts.app>/api/v2` |
-| `VITE_ZITADEL_REDIRECT_URI` | `https://<ingress.hosts.app>/auth/callback` |
-| `VITE_ZITADEL_CLIENT_ID` | Injected from the Zitadel secret at pod startup |
+| `VITE_STACKWEAVER_AUTO_SUBMIT_CODE` | `api.auth.autoSubmitCode` |
 
 The frontend reads `window.__STACKWEAVER__` from `env.js`, with fallback to Vite build-time `import.meta.env` variables for development.
 
@@ -274,6 +273,9 @@ The table below is generated from `values.yaml`. Boilerplate keys (resources, sc
 | api.server.host | string | `"0.0.0.0"` |  |
 | api.server.readTimeout | string | `"30s"` |  |
 | api.server.writeTimeout | string | `"30s"` |  |
+| api.session.idleTimeout | string | `"1h"` | Sign a browser out after this long without user activity (NIST SP 800-63B-4, AAL2). |
+| api.session.livenessInterval | string | `"5m"` | How often a session is checked against Zitadel, so a user or organisation deactivated there, or a session ended there, is signed out here within this interval. |
+| api.session.maxLifetime | string | `"12h"` | Sign a browser out this long after sign-in, whatever its activity. |
 | api.tolerations | list | `[]` |  |
 | api.trustedProxies | string | `"10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"` | Proxy CIDRs the API trusts for `X-Forwarded-For` client-IP attribution (comma-separated). Behind an ingress the API's direct peer is the ingress pod, so without this every request shares ONE per-IP rate-limit bucket (10 req/s on /auth for the whole deployment) and all per-IP security keying collapses to a single key. The RFC1918 default trusts any in-cluster proxy - convenient and correct for typical clusters, but any in-cluster workload could spoof X-Forwarded-For; to harden, set this to your ingress controller's pod CIDR, or to "" to trust no proxies (client IP = direct peer, restoring the shared-bucket behavior). |
 | customCA.cert | string | `""` | Inline PEM-encoded CA cert(s); the chart creates a ConfigMap from this |
@@ -400,9 +402,10 @@ The table below is generated from `values.yaml`. Boilerplate keys (resources, sc
 | secrets.zitadel.keys.adminPassword | string | `"admin-password"` |  |
 | secrets.zitadel.keys.adminPat | string | `"admin-pat"` |  |
 | secrets.zitadel.keys.adminUsername | string | `"admin-username"` |  |
+| secrets.zitadel.keys.bffClientId | string | `"bff-client-id"` |  |
+| secrets.zitadel.keys.bffClientSecret | string | `"bff-client-secret"` |  |
 | secrets.zitadel.keys.clientId | string | `"client-id"` |  |
 | secrets.zitadel.keys.clientSecret | string | `"client-secret"` |  |
-| secrets.zitadel.keys.frontendClientId | string | `"frontend-client-id"` |  |
 | secrets.zitadel.keys.loginServiceUserToken | string | `"login-service-user-token"` |  |
 | secrets.zitadel.keys.masterkey | string | `"masterkey"` |  |
 | secrets.zitadel.keys.webhookComplementTokenKey | string | `"webhook-complement-token-key"` |  |

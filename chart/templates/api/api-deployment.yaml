@@ -115,28 +115,31 @@ spec:
                   name: {{ include "stackweaver.secrets.zitadel" . }}
                   key: {{ .Values.secrets.zitadel.keys.clientSecret }}
                   optional: true
-            # AUD-012 audience enforcement: real user access tokens carry the
-            # frontend PKCE client_id in `aud`, so the API must accept it or
-            # every browser-issued token is rejected with 401 (#581). Must be a
-            # secretKeyRef - zitadel-init regenerates this id on re-init, so a
-            # templated literal would break on the next bootstrap.
-            - name: ZITADEL_FRONTEND_CLIENT_ID
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "stackweaver.secrets.zitadel" . }}
-                  key: {{ .Values.secrets.zitadel.keys.frontendClientId }}
-                  optional: true
+            # The login service account's token, the confidential client the API completes browser
+            # sign-in with, and its secret. NOT optional: zitadel-init writes all three, and the API
+            # refuses to start in release mode without them, so a pod created before they exist
+            # waits in CreateContainerConfigError naming the missing key and starts once it
+            # appears, instead of crash-looping.
             - name: ZITADEL_LOGIN_SERVICE_USER_TOKEN
               valueFrom:
                 secretKeyRef:
                   name: {{ include "stackweaver.secrets.zitadel" . }}
                   key: {{ .Values.secrets.zitadel.keys.loginServiceUserToken }}
-                  optional: true
+            - name: ZITADEL_BFF_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "stackweaver.secrets.zitadel" . }}
+                  key: {{ .Values.secrets.zitadel.keys.bffClientId }}
+            - name: ZITADEL_BFF_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "stackweaver.secrets.zitadel" . }}
+                  key: {{ .Values.secrets.zitadel.keys.bffClientSecret }}
             # ── Auth proxy config (custom login UI, replaces zitadel-login container) ──
             - name: STACKWEAVER_NOTIFICATION_MODE
               value: {{ .Values.api.auth.notificationMode | default "email" | quote }}
             - name: STACKWEAVER_DEFAULT_REDIRECT_URI
-              value: {{ include "stackweaver.frontend.redirectURI" . | quote }}
+              value: {{ include "stackweaver.signInRedirectURI" . | quote }}
             - name: STACKWEAVER_AUTO_SUBMIT_CODE
               value: {{ .Values.api.auth.autoSubmitCode | default false | quote }}
             # Forward the external host so Zitadel builds IdP callback URLs against
@@ -200,6 +203,13 @@ spec:
                   name: {{ include "stackweaver.secrets.oidc" . }}
                   key: {{ .Values.secrets.oidc.keys.signingKey }}
                   optional: true
+            # ── Browser sessions ──
+            - name: STACKWEAVER_SESSION_IDLE_TIMEOUT
+              value: {{ .Values.api.session.idleTimeout | quote }}
+            - name: STACKWEAVER_SESSION_MAX_LIFETIME
+              value: {{ .Values.api.session.maxLifetime | quote }}
+            - name: STACKWEAVER_SESSION_LIVENESS_INTERVAL
+              value: {{ .Values.api.session.livenessInterval | quote }}
             # ── CORS ──
             {{- if .Values.api.corsExtraOrigins }}
             - name: CORS_EXTRA_ORIGINS
