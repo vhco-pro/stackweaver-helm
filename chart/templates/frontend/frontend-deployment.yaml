@@ -27,13 +27,8 @@ spec:
       securityContext:
         runAsNonRoot: true
         runAsUser: 65532
-      {{/*
-        Init container: injects VITE_ZITADEL_CLIENT_ID from the Zitadel secret
-        into env.js (the ConfigMap can't reference secrets). Copies the ConfigMap
-        env.js, then appends the client ID line.
-      */}}
+      {{- if .Values.zitadel.bundled }}
       initContainers:
-        {{- if .Values.zitadel.bundled }}
         - name: wait-for-zitadel
           image: busybox:1.36
           securityContext:
@@ -60,44 +55,7 @@ spec:
                 sleep 3
               done
               echo "Zitadel is ready."
-        {{- end }}
-        - name: inject-client-id
-          image: busybox:1.36
-          securityContext:
-            readOnlyRootFilesystem: true
-            allowPrivilegeEscalation: false  # AUD-063
-            capabilities:
-              drop:
-                - ALL
-            seccompProfile:
-              type: RuntimeDefault
-          resources:
-            requests:
-              cpu: 10m
-              memory: 16Mi
-            limits:
-              cpu: 50m
-              memory: 32Mi
-          command:
-            - sh
-            - -c
-            - |
-              cp /config-src/env.js /config-out/env.js
-              # Replace closing brace to add VITE_ZITADEL_CLIENT_ID
-              sed -i 's/};/  VITE_ZITADEL_CLIENT_ID: "'"$VITE_ZITADEL_CLIENT_ID"'",\n};/' /config-out/env.js
-          env:
-            - name: VITE_ZITADEL_CLIENT_ID
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "stackweaver.secrets.zitadel" . }}
-                  key: {{ .Values.secrets.zitadel.keys.frontendClientId }}
-                  optional: true
-          volumeMounts:
-            - name: config-src
-              mountPath: /config-src
-              readOnly: true
-            - name: config-out
-              mountPath: /config-out
+      {{- end }}
       containers:
         - name: frontend
           image: "{{ .Values.frontend.image.repository }}:{{ .Values.frontend.image.tag }}"
@@ -115,7 +73,7 @@ spec:
               containerPort: {{ .Values.frontend.port }}
               protocol: TCP
           volumeMounts:
-            - name: config-out
+            - name: config-src
               mountPath: /usr/share/nginx/html/env.js
               subPath: env.js
               readOnly: true
@@ -154,8 +112,6 @@ spec:
         - name: config-src
           configMap:
             name: {{ include "stackweaver.fullname" . }}-frontend-config
-        - name: config-out
-          emptyDir: {}
         - name: nginx-cache
           emptyDir: {}
         - name: nginx-lib

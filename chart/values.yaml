@@ -117,7 +117,8 @@ secrets:
       clientId: client-id
       clientSecret: client-secret
       loginServiceUserToken: login-service-user-token
-      frontendClientId: frontend-client-id
+      bffClientId: bff-client-id
+      bffClientSecret: bff-client-secret
       webhookIdpSyncKey: webhook-idp-sync-key
       webhookComplementTokenKey: webhook-complement-token-key
       adminPat: admin-pat
@@ -158,6 +159,16 @@ api:
     writeTimeout: "30s"
   # -- Additional CORS allowed origins (comma-separated)
   corsExtraOrigins: ""
+  # Browser sessions. A signed-in browser holds only a session cookie; these bound how long it lasts.
+  # Values are Go durations such as "1h" or "15m".
+  session:
+    # -- Sign a browser out after this long without user activity (NIST SP 800-63B-4, AAL2).
+    idleTimeout: "1h"
+    # -- Sign a browser out this long after sign-in, whatever its activity.
+    maxLifetime: "12h"
+    # -- How often a session is checked against Zitadel, so a user or organisation deactivated
+    # there, or a session ended there, is signed out here within this interval.
+    livenessInterval: "5m"
   # -- Proxy CIDRs the API trusts for `X-Forwarded-For` client-IP attribution (comma-separated).
   # Behind an ingress the API's direct peer is the ingress pod, so without this every request
   # shares ONE per-IP rate-limit bucket (10 req/s on /auth for the whole deployment) and all

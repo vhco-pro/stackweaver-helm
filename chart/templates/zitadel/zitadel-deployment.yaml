@@ -159,7 +159,7 @@ spec:
               value: /pat/admin.pat
             # Frontend redirect URIs
             - name: FRONTEND_REDIRECT_URI
-              value: {{ include "stackweaver.frontend.redirectURI" . | quote }}
+              value: {{ include "stackweaver.signInRedirectURI" . | quote }}
             - name: FRONTEND_POST_LOGOUT_URI
               value: {{ include "stackweaver.app.url" . | quote }}
             # Login V2 BaseURI
@@ -183,8 +183,10 @@ spec:
               value: {{ .Values.secrets.zitadel.keys.clientSecret }}
             - name: K8S_KEY_LOGIN_SERVICE_USER_TOKEN
               value: {{ .Values.secrets.zitadel.keys.loginServiceUserToken }}
-            - name: K8S_KEY_FRONTEND_CLIENT_ID
-              value: {{ .Values.secrets.zitadel.keys.frontendClientId }}
+            - name: K8S_KEY_BFF_CLIENT_ID
+              value: {{ .Values.secrets.zitadel.keys.bffClientId }}
+            - name: K8S_KEY_BFF_CLIENT_SECRET
+              value: {{ .Values.secrets.zitadel.keys.bffClientSecret }}
             - name: K8S_KEY_WEBHOOK_IDP_SYNC_KEY
               value: {{ .Values.secrets.zitadel.keys.webhookIdpSyncKey }}
             - name: K8S_KEY_WEBHOOK_COMPLEMENT_TOKEN_KEY
@@ -197,6 +199,10 @@ spec:
             # in-cluster service URL instead of localhost.
             - name: ACTIONS_API_BASE_URL
               value: "http://{{ include "stackweaver.fullname" . }}-api:{{ .Values.api.port }}"
+            # Where Zitadel posts a logout token when a browser's Zitadel session ends, so the API
+            # signs that browser out (back-channel logout), over the in-cluster service.
+            - name: ZITADEL_BFF_BACKCHANNEL_LOGOUT_URI
+              value: "http://{{ include "stackweaver.fullname" . }}-api:{{ .Values.api.port }}/auth/oidc/end-session"
             # ── SSO / IdP configuration ──
             {{- if .Values.sso.azureAd.clientId }}
             - name: AZURE_AD_CLIENT_ID

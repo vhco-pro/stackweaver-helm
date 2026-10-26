@@ -330,14 +330,11 @@ API external URL.
 {{- end }}
 
 {{/*
-Frontend OIDC redirect URI.
+Where Zitadel returns the browser after sign-in: the SPA's callback page, whose code the API
+redeems as the confidential BFF client.
 */}}
-{{- define "stackweaver.frontend.redirectURI" -}}
-{{- if (index .Values.frontend.env "VITE_ZITADEL_REDIRECT_URI") }}
-{{- index .Values.frontend.env "VITE_ZITADEL_REDIRECT_URI" }}
-{{- else }}
+{{- define "stackweaver.signInRedirectURI" -}}
 {{- printf "%s/auth/callback" (include "stackweaver.app.url" .) }}
-{{- end }}
 {{- end }}
 
 {{/* ── Ingress annotation helpers ─────────────────────────────────────── */}}
