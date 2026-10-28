@@ -290,6 +290,8 @@ The table below is generated from `values.yaml`. Boilerplate keys (resources, sc
 | frontend.nodeSelector | object | `{}` |  |
 | frontend.podAnnotations | object | `{}` |  |
 | frontend.port | int | `8080` | Frontend listen port |
+| frontend.publicSite.indexing | bool | `false` | Opt public pages into search indexing. Requires publicSite.url; default is noindex. |
+| frontend.publicSite.url | string | `""` | Operator-owned HTTPS URL, optionally including a mount path such as /stack. |
 | frontend.replicas | int | `1` | Frontend replica count |
 | frontend.resources.limits.cpu | string | `"200m"` |  |
 | frontend.resources.limits.memory | string | `"256Mi"` |  |
