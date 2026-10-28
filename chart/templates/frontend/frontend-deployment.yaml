@@ -74,6 +74,10 @@ spec:
               protocol: TCP
           volumeMounts:
             - name: config-src
+              mountPath: /etc/nginx/public-site-settings.conf
+              subPath: public-site-settings.conf
+              readOnly: true
+            - name: config-src
               mountPath: /usr/share/nginx/html/env.js
               subPath: env.js
               readOnly: true

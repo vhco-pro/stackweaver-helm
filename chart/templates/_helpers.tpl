@@ -534,3 +534,26 @@ path for air-gapped clusters, not just a "the Job will no-op" promise.
 {{- if not .Values.secrets.oidc.secretName }}{{- $needed = true -}}{{- end }}
 {{- if $needed }}true{{- end }}
 {{- end }}
+
+{{/* Trusted public-site settings. The URL belongs to the operator, never to request headers. */}}
+{{- define "stackweaver.publicSite.values" -}}
+{{- $site := trimSuffix "/" (.Values.frontend.publicSite.url | default "") -}}
+{{- $indexing := .Values.frontend.publicSite.indexing | default false -}}
+{{- if and $indexing (not $site) }}{{ fail "Public indexing requires an explicit public site URL" }}{{ end -}}
+{{- if and $site (not (regexMatch `^https://[A-Za-z0-9.-]+(:[0-9]+)?(/[A-Za-z0-9_-]+)*$` $site)) }}{{ fail "Public site URL must be an HTTPS origin with an optional clean base path" }}{{ end -}}
+{{- $base := regexReplaceAll `^https://[^/]+` $site "" -}}
+{{- dict "url" $site "basePath" $base "indexing" $indexing | toJson -}}
+{{- end -}}
+
+{{- define "stackweaver.publicSite.settings" -}}
+{{- $site := include "stackweaver.publicSite.values" . | fromJson -}}
+# Generated deployment settings. Mount at /etc/nginx/public-site-settings.conf.
+set $sw_site_url {{ $site.url | quote }};
+set $sw_base_path {{ $site.basePath | quote }};
+set $sw_noindex {{ ternary "" "noindex, nofollow" $site.indexing | quote }};
+set $sw_sitemap_line {{ ternary (printf "Sitemap: %s/sitemap.xml" $site.url) "" $site.indexing | quote }};
+{{ if $site.basePath -}}
+if ($uri = {{ $site.basePath | quote }}) { return 308 {{ $site.basePath }}/; }
+rewrite ^{{ $site.basePath }}(/.*)$ $1 last;
+{{ end -}}
+{{- end -}}

@@ -214,6 +214,11 @@ api:
     clientId: ""
 # -- Frontend (Chainguard nginx SPA, port 8080, non-root) --
 frontend:
+  publicSite:
+    # -- Operator-owned HTTPS URL, optionally including a mount path such as /stack.
+    url: ""
+    # -- Opt public pages into search indexing. Requires publicSite.url; default is noindex.
+    indexing: false
   image:
     # -- Frontend image repository
     repository: ghcr.io/vhco-pro/stackweaver-frontend
