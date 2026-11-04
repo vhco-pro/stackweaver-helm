@@ -167,6 +167,12 @@ spec:
             #    relay, and by status check links) ──
             - name: STACKWEAVER_APP_URL
               value: {{ include "stackweaver.app.url" . | quote }}
+            # ── Private registry host: the API's public host, which module sources name and a
+            #    job's registry token is minted for ──
+            {{- if not (hasKey .Values.api.env "STACKWEAVER_REGISTRY_HOST") }}
+            - name: STACKWEAVER_REGISTRY_HOST
+              value: {{ (urlParse (include "stackweaver.api.url" .)).host | quote }}
+            {{- end }}
             # ── GitHub App ──
             {{- if .Values.secrets.githubApp.secretName }}
             - name: GITHUB_APP_ID
@@ -233,6 +239,14 @@ spec:
             - name: OIDC_REMOVE_FROM_NON_SSO_TEAMS
               value: "true"
             {{- end }}
+            # ── Hosted launchers ──
+            # The secret the hosted launchers register with (#933); the API upserts it as the
+            # hosted registration key.
+            - name: STACKWEAVER_HOSTED_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "stackweaver.secrets.hosted" . }}
+                  key: {{ .Values.secrets.hosted.keys.secret }}
             # ── Platform administration ──
             # The declared platform administrators: the explicit list, or else the bundled
             # Zitadel's bootstrap admin, whose email the API matches at sign-in. An external
@@ -258,6 +272,12 @@ spec:
             {{- if .Values.tofu.versionIndexUrl }}
             - name: TOFU_VERSION_INDEX_URL
               value: {{ .Values.tofu.versionIndexUrl | quote }}
+            {{- end }}
+            {{- if and (include "stackweaver.customCA.enabled" .) (not (hasKey .Values.api.env "STACKWEAVER_JOB_CA_FILE")) }}
+            # The install's custom CA, handed to job pods in their mirror block: a job pod mounts
+            # nothing of the chart's, so this is how it trusts an internal registry or mirror.
+            - name: STACKWEAVER_JOB_CA_FILE
+              value: /etc/ssl/certs/custom-ca.crt
             {{- end }}
             # ── Extra env vars (user overrides) ──
             {{- range $key, $value := .Values.api.env }}

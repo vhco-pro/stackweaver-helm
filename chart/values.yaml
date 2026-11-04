@@ -97,12 +97,19 @@ secrets:
       secretKey: secret-key
   # Encryption key, 32-byte hex string
   # Auto-generates a random key when secretName is empty.
-  # Used by API, runner, and ansible-runner for encrypting variables/credentials.
+  # Used by the API alone to encrypt variables and credentials; launchers and jobs never hold it.
   encryption:
     # -- External encryption-key secret name; empty auto-generates a 32-byte hex key
     secretName: ""
     keys:
       key: encryption-key
+  # The hosted launchers' registration secret, shared by the API and the launchers (#933).
+  # Auto-generates a `tfe-` token when secretName is empty.
+  hosted:
+    # -- External hosted-registration secret name; empty auto-generates one
+    secretName: ""
+    keys:
+      secret: hosted-secret
   # Zitadel credentials
   # Auto-generates masterkey + admin password when empty.
   # After zitadel-init runs, it populates clientId, clientSecret, etc.
@@ -266,7 +273,40 @@ orchestrator:
   githubApp:
     id: ""
     name: ""
-# -- OpenTofu Runner --
+# ── Launchers ─────────────────────────────────────────────────────────────────
+# The OpenTofu and Ansible launchers place every job in a pod of its own in the job namespace
+# (#933). They hold no database, storage, Redis or platform secret; a job pod fetches what its
+# job needs from the API with a token for that job alone.
+launcher:
+  # -- Where jobs run: `kubernetes` (a pod per job) or `inprocess` (inside the launcher pod)
+  driver: kubernetes
+  # -- Job network: `platform` (node metadata blocked) or `host-identity` (the node's identity reachable)
+  network: platform
+  # -- Namespace job pods run in; empty uses the release namespace
+  jobNamespace: ""
+  # -- Create `jobNamespace`, enforcing the restricted Pod Security Standard
+  createJobNamespace: false
+  # -- Pod and service CIDRs job pods may not reach, IPv4 and IPv6 (the API and DNS stay open)
+  clusterCIDRs: []
+  # -- Extra egress rules (NetworkPolicy `to` and `ports`) for job pods, appended as given: a
+  # destination inside clusterCIDRs that jobs must reach, such as an internal registry
+  extraJobEgress: []
+  # -- runtimeClassName of every job pod (`gvisor`, `kata`); empty uses the cluster default
+  runtimeClassName: ""
+  # -- uid job pods run as when an image's user is not numeric
+  jobUID: 1001
+  # -- How long a failed job's pod is kept for inspection (`30m`); empty keeps none
+  keepFailedJobsFor: ""
+  # -- Labels, annotations, nodeSelector, tolerations and priorityClassName merged into every job pod
+  podTemplate: {}
+  # -- Placement group the hosted launchers serve (`default` when empty)
+  hostedGroup: ""
+  # -- Refuse the in-process driver and the host-identity network (the SaaS setting)
+  hostedStrict: false
+  # -- Port of the launchers' /healthz and /readyz
+  healthPort: 9090
+
+# -- OpenTofu launcher --
 runner:
   image:
     # -- OpenTofu runner image repository
@@ -274,8 +314,10 @@ runner:
     # -- OpenTofu runner image tag
     tag: latest
     pullPolicy: IfNotPresent
-  # -- OpenTofu runner replica count
+  # -- OpenTofu launcher replica count
   replicas: 1
+  # -- Jobs each OpenTofu launcher runs at once, each in a pod of its own
+  maxConcurrentJobs: 4
   resources:
     requests:
       cpu: 200m
@@ -284,15 +326,16 @@ runner:
       cpu: "1"
       memory: 1Gi
   env: {}
-  # Runs are not handed the runner's own environment (it holds the platform's secrets), only
-  # an allowlist of it. List here the names of further variables, set in runner.env, that runs
-  # should receive. Names only, matched exactly.
+  # Runs are handed only an allowlist of the launcher's own environment. List here the names
+  # of further variables, set in runner.env, that runs should receive. Names only, matched
+  # exactly.
   # -- Names of extra runner variables (from `runner.env`) to hand to OpenTofu runs
   runEnvPassthrough: []
   podAnnotations: {}
   nodeSelector: {}
   tolerations: []
   affinity: {}
+
 # -- Secrets bootstrap job --
 # The secrets-init hook Job creates every secret you did not supply via secrets.*.secretName.
 # It runs the first-party /secrets-init binary - stdlib-only Go on distroless, no shell, no OS
@@ -311,7 +354,7 @@ secretsInit:
     # -- Secrets-init image pull policy
     pullPolicy: IfNotPresent
 
-# -- Ansible Runner --
+# -- Ansible launcher --
 ansibleRunner:
   image:
     # -- Ansible runner image repository
@@ -319,8 +362,10 @@ ansibleRunner:
     # -- Ansible runner image tag
     tag: latest
     pullPolicy: IfNotPresent
-  # -- Ansible runner replica count
+  # -- Ansible launcher replica count
   replicas: 1
+  # -- Jobs and syncs each Ansible launcher runs at once, each in a pod of its own
+  maxConcurrentJobs: 4
   resources:
     requests:
       cpu: 200m
@@ -329,60 +374,15 @@ ansibleRunner:
       cpu: "1"
       memory: 1Gi
   env: {}
-  # Jobs, inventory syncs and Galaxy installs are not handed the runner's own environment (it
-  # holds the platform's secrets), only an allowlist of it. List here the names of further
-  # variables, set in ansibleRunner.env, that they should receive. Names only, matched exactly.
+  # Jobs, inventory syncs and Galaxy installs are handed only an allowlist of the launcher's own
+  # environment. List here the names of further variables, set in ansibleRunner.env, that they
+  # should receive. Names only, matched exactly.
   # -- Names of extra runner variables (from `ansibleRunner.env`) to hand to Ansible jobs and syncs
   runEnvPassthrough: []
   podAnnotations: {}
   nodeSelector: {}
   tolerations: []
   affinity: {}
-  # Size limit for the writable /tmp emptyDir (Ansible local temp, SSH control
-  # sockets). Bounds ephemeral disk use under the read-only root filesystem.
-  # -- Size limit for the writable `/tmp` emptyDir (Ansible local temp, SSH control sockets)
-  tmpSizeLimit: 1Gi
-  # Size limit for the per-job scratch emptyDir mounted at /home/stackweaver/workspaces
-  # (playbook checkout, inventory, staged credentials, Galaxy install staging).
-  # Cleaned per job and isolated from the terraform runner's volume; it holds no
-  # run history (output/status/events live in Postgres + object storage), so an
-  # emptyDir is safe and survives nothing it needs to.
-  # -- Size limit for the per-job scratch emptyDir at `/home/stackweaver/workspaces`
-  workspacesSizeLimit: 5Gi
-  # Dedicated per-project Ansible Galaxy cache, mounted at
-  # /home/stackweaver/workspaces/galaxy-cache and kept off the shared runner volume.
-  # The cache is a regenerable performance optimization - collections simply
-  # re-download if it is lost - so modest sizing and ReadWriteOnce are fine.
-  # Set enabled=false to fall back to an ephemeral emptyDir (cold cache on every
-  # pod restart). For replicas > 1, set accessMode to ReadWriteMany.
-  galaxyCache:
-    # -- Provision a dedicated PVC for the Galaxy cache; `false` uses an ephemeral emptyDir
-    enabled: true
-    # -- Galaxy cache PVC size
-    size: 5Gi
-    # -- Galaxy cache PVC storage class
-    storageClass: ""
-    # -- Galaxy cache PVC access mode (`ReadWriteMany` for replicas > 1)
-    accessMode: ReadWriteOnce
-    # -- Use a pre-existing PVC instead of provisioning one
-    existingClaim: ""  # if set, skip PVC creation and use this pre-existing claim name
-    # -- emptyDir size cap, only used when `enabled=false`
-    sizeLimit: 5Gi     # only used when enabled=false (emptyDir size cap)
-  # AKS Workload Identity for Azure dynamic-inventory sync (auth_method:
-  # workload_identity). When enabled, the ansible-runner pod gets the
-  # `azure.workload.identity/use: "true"` label so the Azure webhook injects the
-  # projected SA token + AZURE_* env. You must ALSO annotate the ServiceAccount with
-  # the user-assigned managed identity's client id via `serviceAccount.annotations`:
-  #   serviceAccount:
-  #     annotations:
-  #       azure.workload.identity/client-id: <MI-CLIENT-ID>
-  # Note: the SA is shared across all stackweaver pods, so the annotation applies
-  # cluster-wide. Managed Identity via IMDS (auth_method: managed_identity) needs
-  # none of this - only a node/kubelet or user-assigned identity with Reader on the
-  # target subscription.
-  workloadIdentity:
-    # -- Enable AKS Workload Identity for Azure dynamic-inventory sync
-    enabled: false
 # ── Storage ───────────────────────────────────────────────────────────────────
 # All data (state, configs, registry, logs, ansible artifacts) is stored in a
 # single S3-compatible bucket. Any S3-compatible service works: AWS S3, R2, B2,
@@ -405,16 +405,6 @@ storage:
   # -- Storage auth mode: `credentials` or `pod-identity` (IRSA/Workload Identity)
   auth: credentials
   serviceAccountAnnotations: {}
-# ── Runner Workspaces PVC ─────────────────────────────────────────────────────
-runnerWorkspaces:
-  # -- Shared runner workspaces PVC size
-  size: 10Gi
-  # -- Runner workspaces PVC storage class
-  storageClass: ""
-  # -- Runner workspaces PVC access mode
-  accessMode: ReadWriteMany
-  # -- Use a pre-existing PVC instead of provisioning one
-  existingClaim: ""  # if set, skip PVC creation and use this pre-existing claim name
 # ── Dependencies ──────────────────────────────────────────────────────────────
 #
 # For each dependency, set enabled=true to deploy it in-cluster (bundled),
@@ -682,6 +672,8 @@ signup:
 # The cert is mounted at /etc/ssl/certs/custom-ca.crt via subPath (so the
 # system cert directory is not replaced). Go's crypto/x509 package scans
 # /etc/ssl/certs/ automatically on Linux, so no extra env vars are needed.
+# Job pods mount nothing of the chart's: the API hands them the same CA with each
+# job (STACKWEAVER_JOB_CA_FILE), so their tools trust an internal registry too.
 customCA:
   # Inline PEM-encoded CA certificate(s). The chart creates a ConfigMap from
   # this value. Ignored when existingSecret or existingConfigMap is set.

@@ -1,0 +1,117 @@
+{{/* The job namespace's network policies (#933, D5): job pods take no ingress, reach DNS, the API
+     pods and the internet, and not the cluster's pod and service ranges, node metadata or Azure's
+     platform address. One
+     more policy per pod identity mechanism opens that mechanism's endpoint to its pods alone.
+     The chart owns these, so the launchers leave them alone (RUNNER_MANAGE_NETWORK_POLICY).
+     launcher.extraJobEgress appends egress rules as given, for a destination inside the
+     cluster ranges that jobs must reach (an internal registry, the cluster's own ingress). */}}
+{{- $ns := include "stackweaver.launcher.jobNamespace" . }}
+{{- /* Each family's ranges go in that family's ipBlock: the API server refuses an IPv6 entry in the
+       except list of 0.0.0.0/0, so a dual-stack clusterCIDRs list is split by family (as the
+       launcher's RenderNetworkPolicies does). Node metadata is closed but under host identity;
+       168.63.129.16 (Azure's WireServer, HostGAPlugin and DNS) is closed in every mode. */}}
+{{- $hostIdentity := eq .Values.launcher.network "host-identity" }}
+{{- $except4 := list }}
+{{- $except6 := list }}
+{{- range (.Values.launcher.clusterCIDRs | default list) }}
+{{- if contains ":" . }}
+{{- $except6 = append $except6 . }}
+{{- else }}
+{{- $except4 = append $except4 . }}
+{{- end }}
+{{- end }}
+{{- if not $hostIdentity }}
+{{- $except4 = append $except4 "169.254.0.0/16" }}
+{{- $except6 = concat $except6 (list "fd00:ec2::/64" "fd20:ce::/64") }}
+{{- end }}
+{{- $except4 = append $except4 "168.63.129.16/32" }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: stackweaver-jobs
+  namespace: {{ $ns }}
+  labels:
+    {{- include "stackweaver.labels" . | nindent 4 }}
+    app.kubernetes.io/component: launcher
+spec:
+  podSelector:
+    matchLabels:
+      stackweaver.io/managed-by: launcher
+      stackweaver.io/role: job
+  policyTypes: [Ingress, Egress]
+  egress:
+    - to:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - { protocol: UDP, port: 53 }
+        - { protocol: TCP, port: 53 }
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Release.Namespace }}
+          podSelector:
+            matchLabels:
+              {{- include "stackweaver.selectorLabels" . | nindent 14 }}
+              app.kubernetes.io/component: api
+      ports:
+        - { protocol: TCP, port: {{ .Values.api.port }} }
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              {{- toYaml $except4 | nindent 14 }}
+        - ipBlock:
+            cidr: ::/0
+            {{- with $except6 }}
+            except:
+              {{- toYaml . | nindent 14 }}
+            {{- end }}
+    {{- with .Values.launcher.extraJobEgress }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: stackweaver-jobs-aws-pod-identity
+  namespace: {{ $ns }}
+  labels:
+    {{- include "stackweaver.labels" . | nindent 4 }}
+    app.kubernetes.io/component: launcher
+spec:
+  podSelector:
+    matchLabels:
+      stackweaver.io/managed-by: launcher
+      stackweaver.io/role: job
+      stackweaver.io/identity-mechanism: aws-pod-identity
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - ipBlock: { cidr: 169.254.170.23/32 }
+        - ipBlock: { cidr: fd00:ec2::23/128 }
+      ports:
+        - { protocol: TCP, port: 80 }
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: stackweaver-jobs-gcp-workload-identity
+  namespace: {{ $ns }}
+  labels:
+    {{- include "stackweaver.labels" . | nindent 4 }}
+    app.kubernetes.io/component: launcher
+spec:
+  podSelector:
+    matchLabels:
+      stackweaver.io/managed-by: launcher
+      stackweaver.io/role: job
+      stackweaver.io/identity-mechanism: gcp-workload-identity
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - ipBlock: { cidr: 169.254.169.254/32 }
+      ports:
+        - { protocol: TCP, port: 80 }

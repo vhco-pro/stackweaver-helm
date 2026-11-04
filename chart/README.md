@@ -29,7 +29,7 @@ helm install stackweaver ./deploy/helm/stackweaver \
 ```
 
 This deploys:
-- **Core**: API, Frontend, Orchestrator, OpenTofu Runner, Ansible Runner
+- **Core**: API, Frontend, Orchestrator, OpenTofu launcher, Ansible launcher
 - **Dependencies**: PostgreSQL 17, Redis 8, Garage, Zitadel + Login UI
 - **Networking**: Two-domain ingress with TLS
 - **Secrets**: Auto-generated for PostgreSQL, Garage storage, encryption, and Zitadel
@@ -230,27 +230,19 @@ The table below is generated from `values.yaml`. Boilerplate keys (resources, sc
 |-----|------|---------|-------------|
 | ansibleRunner.affinity | object | `{}` |  |
 | ansibleRunner.env | object | `{}` |  |
-| ansibleRunner.galaxyCache.accessMode | string | `"ReadWriteOnce"` | Galaxy cache PVC access mode (`ReadWriteMany` for replicas > 1) |
-| ansibleRunner.galaxyCache.enabled | bool | `true` | Provision a dedicated PVC for the Galaxy cache; `false` uses an ephemeral emptyDir |
-| ansibleRunner.galaxyCache.existingClaim | string | `""` | Use a pre-existing PVC instead of provisioning one |
-| ansibleRunner.galaxyCache.size | string | `"5Gi"` | Galaxy cache PVC size |
-| ansibleRunner.galaxyCache.sizeLimit | string | `"5Gi"` | emptyDir size cap, only used when `enabled=false` |
-| ansibleRunner.galaxyCache.storageClass | string | `""` | Galaxy cache PVC storage class |
 | ansibleRunner.image.pullPolicy | string | `"IfNotPresent"` |  |
 | ansibleRunner.image.repository | string | `"ghcr.io/vhco-pro/stackweaver-ansible-runner"` | Ansible runner image repository |
 | ansibleRunner.image.tag | string | `"latest"` | Ansible runner image tag |
+| ansibleRunner.maxConcurrentJobs | int | `4` | Jobs and syncs each Ansible launcher runs at once, each in a pod of its own |
 | ansibleRunner.nodeSelector | object | `{}` |  |
 | ansibleRunner.podAnnotations | object | `{}` |  |
-| ansibleRunner.replicas | int | `1` | Ansible runner replica count |
+| ansibleRunner.replicas | int | `1` | Ansible launcher replica count |
 | ansibleRunner.resources.limits.cpu | string | `"1"` |  |
 | ansibleRunner.resources.limits.memory | string | `"1Gi"` |  |
 | ansibleRunner.resources.requests.cpu | string | `"200m"` |  |
 | ansibleRunner.resources.requests.memory | string | `"256Mi"` |  |
 | ansibleRunner.runEnvPassthrough | list | `[]` | Names of extra runner variables (from `ansibleRunner.env`) to hand to Ansible jobs and syncs |
-| ansibleRunner.tmpSizeLimit | string | `"1Gi"` | Size limit for the writable `/tmp` emptyDir (Ansible local temp, SSH control sockets) |
 | ansibleRunner.tolerations | list | `[]` |  |
-| ansibleRunner.workloadIdentity.enabled | bool | `false` | Enable AKS Workload Identity for Azure dynamic-inventory sync |
-| ansibleRunner.workspacesSizeLimit | string | `"5Gi"` | Size limit for the per-job scratch emptyDir at `/home/stackweaver/workspaces` |
 | api.affinity | object | `{}` |  |
 | api.auth.autoSubmitCode | bool | `false` | Auto-submit OTP forms when the full code is pasted |
 | api.auth.notificationMode | string | `"email"` | Auth code delivery: `email` (Zitadel delivers codes; the only production value) |
@@ -322,6 +314,19 @@ The table below is generated from `values.yaml`. Boilerplate keys (resources, sc
 | ingress.tls.authSecretName | string | `"stackweaver-auth-tls"` | TLS secret for the auth domain |
 | ingress.tls.enabled | bool | `true` | Enable TLS on both Ingress resources |
 | ingress.tls.secretName | string | `"stackweaver-tls"` | TLS secret for the app domain |
+| launcher.clusterCIDRs | list | `[]` | Pod and service CIDRs job pods may not reach, IPv4 and IPv6 (the API and DNS stay open) |
+| launcher.createJobNamespace | bool | `false` | Create `jobNamespace`, enforcing the restricted Pod Security Standard |
+| launcher.driver | string | `"kubernetes"` | Where jobs run: `kubernetes` (a pod per job) or `inprocess` (inside the launcher pod) |
+| launcher.extraJobEgress | list | `[]` | Extra egress rules (NetworkPolicy `to` and `ports`) for job pods, appended as given: a destination inside clusterCIDRs that jobs must reach, such as an internal registry |
+| launcher.healthPort | int | `9090` | Port of the launchers' /healthz and /readyz |
+| launcher.hostedGroup | string | `""` | Placement group the hosted launchers serve (`default` when empty) |
+| launcher.hostedStrict | bool | `false` | Refuse the in-process driver and the host-identity network (the SaaS setting) |
+| launcher.jobNamespace | string | `""` | Namespace job pods run in; empty uses the release namespace |
+| launcher.jobUID | int | `1001` | uid job pods run as when an image's user is not numeric |
+| launcher.keepFailedJobsFor | string | `""` | How long a failed job's pod is kept for inspection (`30m`); empty keeps none |
+| launcher.network | string | `"platform"` | Job network: `platform` (node metadata blocked) or `host-identity` (the node's identity reachable) |
+| launcher.podTemplate | object | `{}` | Labels, annotations, nodeSelector, tolerations and priorityClassName merged into every job pod |
+| launcher.runtimeClassName | string | `""` | runtimeClassName of every job pod (`gvisor`, `kata`); empty uses the cluster default |
 | nameOverride | string | `""` |  |
 | oidc.issuerUrl | string | `""` | Issuer URL for OIDC workload-identity tokens (non-secret) |
 | orchestrator.affinity | object | `{}` |  |
@@ -373,25 +378,24 @@ The table below is generated from `values.yaml`. Boilerplate keys (resources, sc
 | runner.image.pullPolicy | string | `"IfNotPresent"` |  |
 | runner.image.repository | string | `"ghcr.io/vhco-pro/stackweaver-opentofu-runner"` | OpenTofu runner image repository |
 | runner.image.tag | string | `"latest"` | OpenTofu runner image tag |
+| runner.maxConcurrentJobs | int | `4` | Jobs each OpenTofu launcher runs at once, each in a pod of its own |
 | runner.nodeSelector | object | `{}` |  |
 | runner.podAnnotations | object | `{}` |  |
-| runner.replicas | int | `1` | OpenTofu runner replica count |
+| runner.replicas | int | `1` | OpenTofu launcher replica count |
 | runner.resources.limits.cpu | string | `"1"` |  |
 | runner.resources.limits.memory | string | `"1Gi"` |  |
 | runner.resources.requests.cpu | string | `"200m"` |  |
 | runner.resources.requests.memory | string | `"256Mi"` |  |
 | runner.runEnvPassthrough | list | `[]` | Names of extra runner variables (from `runner.env`) to hand to OpenTofu runs |
 | runner.tolerations | list | `[]` |  |
-| runnerWorkspaces.accessMode | string | `"ReadWriteMany"` | Runner workspaces PVC access mode |
-| runnerWorkspaces.existingClaim | string | `""` | Use a pre-existing PVC instead of provisioning one |
-| runnerWorkspaces.size | string | `"10Gi"` | Shared runner workspaces PVC size |
-| runnerWorkspaces.storageClass | string | `""` | Runner workspaces PVC storage class |
 | secrets.encryption.keys.key | string | `"encryption-key"` |  |
 | secrets.encryption.secretName | string | `""` | External encryption-key secret name; empty auto-generates a 32-byte hex key |
 | secrets.githubApp.keys.clientSecret | string | `"client-secret"` | Key holding the GitHub App's OAuth client secret. Connecting an installation asks the person to authorize the App and needs it, together with api.githubApp.clientId. |
 | secrets.githubApp.keys.privateKey | string | `"private-key"` |  |
 | secrets.githubApp.keys.webhookSecret | string | `"webhook-secret"` |  |
 | secrets.githubApp.secretName | string | `""` | GitHub App credentials secret name (private key, webhook secret, OAuth client secret) |
+| secrets.hosted.keys.secret | string | `"hosted-secret"` |  |
+| secrets.hosted.secretName | string | `""` | External hosted-registration secret name; empty auto-generates one |
 | secrets.oidc.keys.signingKey | string | `"signing-key"` |  |
 | secrets.oidc.secretName | string | `""` | External OIDC workload-identity signing-key secret; empty auto-generates an RSA key pair |
 | secrets.postgresql.keys.password | string | `"password"` |  |
@@ -470,6 +474,8 @@ The table below is generated from `values.yaml`. Boilerplate keys (resources, sc
 | zitadel.resources.requests.memory | string | `"512Mi"` |  |
 
 ## Upgrading
+
+Back up PostgreSQL and the object storage bucket before upgrading to the chart version that introduces the launchers. That upgrade is forward-only: the database cannot be downgraded in place, and rolling back is a restore of both backups together with the previous chart version, not a `helm rollback`.
 
 ```bash
 helm upgrade stackweaver ./deploy/helm/stackweaver \

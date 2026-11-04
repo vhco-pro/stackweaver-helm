@@ -29,6 +29,15 @@ To view a generated password:
 All secrets are managed externally. The chart did not create any Secret resources.
 {{- end }}
 
+{{- if .Release.IsUpgrade }}
+
+── Upgrades ──
+
+Upgrades are forward-only. Before an upgrade, back up PostgreSQL and the
+object storage bucket: rolling back is a restore of both backups together
+with the previous chart version, not a `helm rollback`.
+{{- end }}
+
 {{- if .Values.zitadel.bundled }}
 
 ── Zitadel Initialization ──
