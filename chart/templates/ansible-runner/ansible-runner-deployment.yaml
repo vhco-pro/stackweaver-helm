@@ -1,3 +1,7 @@
+{{/* The Ansible launcher (#933, D3, D4): it registers as the deployment's hosted launcher, holds one
+     long-poll heartbeat and places every job it claims in a fresh pod of its own in the job
+     namespace through the Kubernetes driver. It holds no database, storage, Redis, encryption,
+     OIDC signing or VCS app secret, mounts no volume of jobs, and runs no user code. */}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -16,120 +20,60 @@ spec:
       labels:
         {{- include "stackweaver.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: ansible-runner
-        {{- if .Values.ansibleRunner.workloadIdentity.enabled }}
-        azure.workload.identity/use: "true"
-        {{- end }}
       {{- with .Values.ansibleRunner.podAnnotations }}
       annotations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
     spec:
       {{- include "stackweaver.imagePullSecrets" . | nindent 6 }}
-      serviceAccountName: {{ include "stackweaver.serviceAccountName" . }}
+      serviceAccountName: {{ include "stackweaver.launcher.serviceAccountName" . }}
       securityContext:
         runAsNonRoot: true
         runAsUser: 1001
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: ansible-runner
           image: "{{ .Values.ansibleRunner.image.repository }}:{{ .Values.ansibleRunner.image.tag }}"
           imagePullPolicy: {{ .Values.ansibleRunner.image.pullPolicy }}
           securityContext:
             readOnlyRootFilesystem: true
-            # Defense-in-depth: the runner needs no Linux capabilities (privilege
-            # escalation for Ansible "become" happens on the target host over SSH,
-            # not in this container), so drop them all and forbid regaining any.
             allowPrivilegeEscalation: false
             capabilities:
               drop:
                 - ALL
-            seccompProfile:
-              type: RuntimeDefault
+          ports:
+            - name: health
+              containerPort: {{ .Values.launcher.healthPort }}
           env:
             - name: LOG_LEVEL
               value: info
-            # ── Database ──
-            {{- include "stackweaver.env.database" . | nindent 12 }}
-            # ── Redis ──
-            {{- include "stackweaver.env.redis" . | nindent 12 }}
-            # ── Storage ──
-            {{- include "stackweaver.env.storage" . | nindent 12 }}
-            # ── Encryption ──
-            {{- include "stackweaver.env.encryption" . | nindent 12 }}
-            # ── OIDC Workload Identity ──
-            # Only set when explicitly configured. Do NOT fall back to the API URL:
-            # that produces a {host}/api/v2 issuer, but external verifiers (Azure
-            # Entra) fetch {issuer}/.well-known/openid-configuration, served only at
-            # the ingress root. A missing issuer leaves this unset so the runner uses
-            # its localhost default and warns loudly if an auth_method=oidc Azure
-            # inventory actually needs it - rather than minting a doomed /api/v2 token.
-            {{- if .Values.oidc.issuerUrl }}
-            - name: OIDC_ISSUER_URL
-              value: {{ .Values.oidc.issuerUrl | quote }}
-            {{- end }}
-            - name: OIDC_SIGNING_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "stackweaver.secrets.oidc" . }}
-                  key: {{ .Values.secrets.oidc.keys.signingKey }}
-                  optional: true
-            # ── Workspaces ──
-            - name: WORKSPACES_DIR
-              value: /home/stackweaver/workspaces
-            # ── Ansible ──
-            # Default home under the writable /tmp emptyDir so Ansible can create
-            # its local temp dir under the read-only root filesystem. The runner
-            # overrides this per-job/per-sync onto the workspaces volume.
-            - name: ANSIBLE_HOME
-              value: /tmp/.ansible
-            # Module "remote" temp dir. For local-connection tasks the target is
-            # this read-only container, so it must live under writable /tmp.
-            - name: ANSIBLE_REMOTE_TMP
-              value: /tmp/.ansible/tmp
+            {{- include "stackweaver.env.launcher" . | nindent 12 }}
+            - name: RUNNER_IMAGE
+              value: "{{ .Values.ansibleRunner.image.repository }}:{{ .Values.ansibleRunner.image.tag }}"
+            - name: RUNNER_MAX_CONCURRENT_JOBS
+              value: {{ .Values.ansibleRunner.maxConcurrentJobs | default 4 | quote }}
             # ── Extra env vars (user overrides) ──
             {{- range $key, $value := .Values.ansibleRunner.env }}
             - name: {{ $key }}
               value: {{ $value | quote }}
             {{- end }}
-            # ── Runner variables handed to jobs and syncs beyond the built-in allowlist ──
+            # ── Launcher variables handed to jobs beyond the built-in allowlist ──
             {{- with .Values.ansibleRunner.runEnvPassthrough }}
             - name: STACKWEAVER_RUN_ENV_PASSTHROUGH
               value: {{ join "," . | quote }}
             {{- end }}
+          {{- include "stackweaver.launcher.probes" . | nindent 10 }}
           volumeMounts:
-            # Per-job scratch (playbook checkout, inventory, staged credentials).
-            # Ephemeral and isolated from the terraform runner - it holds no run
-            # history (output/status/events live in Postgres + object storage).
-            - name: workspaces
-              mountPath: /home/stackweaver/workspaces
-            # Dedicated per-project Ansible Galaxy cache, nested under the scratch
-            # mount at the path the runner derives (WORKSPACES_DIR/galaxy-cache).
-            # A regenerable performance cache, kept off the shared runner volume.
-            - name: galaxy-cache
-              mountPath: /home/stackweaver/workspaces/galaxy-cache
             - name: tmp
               mountPath: /tmp
             {{- include "stackweaver.customCA.volumeMount" . | nindent 12 }}
           resources:
             {{- toYaml .Values.ansibleRunner.resources | nindent 12 }}
       volumes:
-        # Ephemeral per-job scratch. Not the shared runner-workspaces PVC: the
-        # ansible runner cleans job dirs per run and keeps no durable data here,
-        # so an emptyDir gives full isolation from the terraform runner with no
-        # data-loss surface and no dependency on RWX storage.
-        - name: workspaces
-          emptyDir:
-            sizeLimit: {{ .Values.ansibleRunner.workspacesSizeLimit | default "5Gi" }}
-        - name: galaxy-cache
-          {{- if .Values.ansibleRunner.galaxyCache.enabled }}
-          persistentVolumeClaim:
-            claimName: {{ .Values.ansibleRunner.galaxyCache.existingClaim | default (printf "%s-ansible-galaxy-cache" (include "stackweaver.fullname" .)) }}
-          {{- else }}
-          emptyDir:
-            sizeLimit: {{ .Values.ansibleRunner.galaxyCache.sizeLimit | default "5Gi" }}
-          {{- end }}
         - name: tmp
           emptyDir:
-            sizeLimit: {{ .Values.ansibleRunner.tmpSizeLimit | default "1Gi" }}
+            sizeLimit: 256Mi
         {{- include "stackweaver.customCA.volume" . | nindent 8 }}
       {{- with .Values.ansibleRunner.nodeSelector }}
       nodeSelector:

@@ -1,0 +1,12 @@
+{{/* The pod template the launchers merge into every job pod (#933, D11): labels, annotations,
+     node selection, tolerations and a priority class. An operator may own it instead. */}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "stackweaver.fullname" . }}-launcher-pod-template
+  namespace: {{ include "stackweaver.launcher.jobNamespace" . }}
+  labels:
+    {{- include "stackweaver.labels" . | nindent 4 }}
+    app.kubernetes.io/component: launcher
+data:
+  pod-template.json: {{ .Values.launcher.podTemplate | toJson | quote }}

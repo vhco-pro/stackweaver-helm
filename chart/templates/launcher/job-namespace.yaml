@@ -1,0 +1,14 @@
+{{/* A job namespace of its own, enforcing the restricted Pod Security Standard, so a job pod that
+     does not satisfy it fails at admission (#933, D4, AC71). Rendered only when the chart creates
+     it; an existing namespace takes the same labels from whoever manages it. */}}
+{{- if and .Values.launcher.jobNamespace .Values.launcher.createJobNamespace }}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Values.launcher.jobNamespace }}
+  labels:
+    {{- include "stackweaver.labels" . | nindent 4 }}
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest
+    pod-security.kubernetes.io/warn: restricted
+{{- end }}

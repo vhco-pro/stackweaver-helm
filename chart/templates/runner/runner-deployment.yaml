@@ -1,3 +1,7 @@
+{{/* The OpenTofu launcher (#933, D3, D4): it registers as the deployment's hosted launcher, holds one
+     long-poll heartbeat and places every job it claims in a fresh pod of its own in the job
+     namespace through the Kubernetes driver. It holds no database, storage, Redis, encryption,
+     OIDC signing or VCS app secret, mounts no volume of jobs, and runs no user code. */}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -22,97 +26,54 @@ spec:
       {{- end }}
     spec:
       {{- include "stackweaver.imagePullSecrets" . | nindent 6 }}
-      serviceAccountName: {{ include "stackweaver.serviceAccountName" . }}
+      serviceAccountName: {{ include "stackweaver.launcher.serviceAccountName" . }}
       securityContext:
         runAsNonRoot: true
         runAsUser: 1001
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: runner
           image: "{{ .Values.runner.image.repository }}:{{ .Values.runner.image.tag }}"
           imagePullPolicy: {{ .Values.runner.image.pullPolicy }}
           securityContext:
             readOnlyRootFilesystem: true
-            allowPrivilegeEscalation: false  # AUD-063
+            allowPrivilegeEscalation: false
             capabilities:
               drop:
                 - ALL
-            seccompProfile:
-              type: RuntimeDefault
+          ports:
+            - name: health
+              containerPort: {{ .Values.launcher.healthPort }}
           env:
             - name: LOG_LEVEL
               value: info
-            # ── Database ──
-            {{- include "stackweaver.env.database" . | nindent 12 }}
-            # ── Redis ──
-            {{- include "stackweaver.env.redis" . | nindent 12 }}
-            # ── Storage ──
-            {{- include "stackweaver.env.storage" . | nindent 12 }}
-            # ── Encryption ──
-            {{- include "stackweaver.env.encryption" . | nindent 12 }}
-            # ── OIDC Workload Identity ──
-            # Only set when explicitly configured. Do NOT fall back to the API URL:
-            # that produces a {host}/api/v2 issuer, but external verifiers (Azure
-            # Entra) fetch {issuer}/.well-known/openid-configuration, served only at
-            # the ingress root. A missing issuer leaves this unset so the runner uses
-            # its localhost default and warns loudly if an auth_method=oidc Azure
-            # workspace actually needs it - rather than minting a doomed /api/v2 token.
-            {{- if .Values.oidc.issuerUrl }}
-            - name: OIDC_ISSUER_URL
-              value: {{ .Values.oidc.issuerUrl | quote }}
-            {{- end }}
-            - name: OIDC_SIGNING_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "stackweaver.secrets.oidc" . }}
-                  key: {{ .Values.secrets.oidc.keys.signingKey }}
-                  optional: true
-            # ── OpenTofu binary sources ──
-            # Override for air-gapped installs that mirror the OpenTofu releases
-            # internally. The mirror must reproduce upstream's layout exactly;
-            # checksum verification against its SHA256SUMS is always enforced.
-            {{- if .Values.tofu.releasesUrl }}
-            - name: TOFU_RELEASES_URL
-              value: {{ .Values.tofu.releasesUrl | quote }}
-            {{- end }}
-            {{- if .Values.tofu.versionIndexUrl }}
-            - name: TOFU_VERSION_INDEX_URL
-              value: {{ .Values.tofu.versionIndexUrl | quote }}
-            {{- end }}
-            # ── Writable HOME ──
-            # With readOnlyRootFilesystem the image's /usr/local/bin isn't
-            # writable, so the runner installs versioned tofu binaries under
-            # $HOME/.tofu-versions (core/tofu/binary.go). The default home
-            # (/home/stackweaver) is read-only too, so point HOME at the writable /tmp
-            # emptyDir - mirrors ANSIBLE_HOME on the ansible-runner.
-            - name: HOME
-              value: /tmp
-            # ── Workspaces ──
-            - name: WORKSPACES_DIR
-              value: /home/stackweaver/workspaces
+            {{- include "stackweaver.env.launcher" . | nindent 12 }}
+            - name: RUNNER_IMAGE
+              value: "{{ .Values.runner.image.repository }}:{{ .Values.runner.image.tag }}"
+            - name: RUNNER_MAX_CONCURRENT_JOBS
+              value: {{ .Values.runner.maxConcurrentJobs | default 4 | quote }}
             # ── Extra env vars (user overrides) ──
             {{- range $key, $value := .Values.runner.env }}
             - name: {{ $key }}
               value: {{ $value | quote }}
             {{- end }}
-            # ── Runner variables handed to runs beyond the built-in allowlist ──
+            # ── Launcher variables handed to jobs beyond the built-in allowlist ──
             {{- with .Values.runner.runEnvPassthrough }}
             - name: STACKWEAVER_RUN_ENV_PASSTHROUGH
               value: {{ join "," . | quote }}
             {{- end }}
+          {{- include "stackweaver.launcher.probes" . | nindent 10 }}
           volumeMounts:
-            - name: workspaces
-              mountPath: /home/stackweaver/workspaces
             - name: tmp
               mountPath: /tmp
             {{- include "stackweaver.customCA.volumeMount" . | nindent 12 }}
           resources:
             {{- toYaml .Values.runner.resources | nindent 12 }}
       volumes:
-        - name: workspaces
-          persistentVolumeClaim:
-            claimName: {{ .Values.runnerWorkspaces.existingClaim | default (printf "%s-runner-workspaces" (include "stackweaver.fullname" .)) }}
         - name: tmp
-          emptyDir: {}
+          emptyDir:
+            sizeLimit: 256Mi
         {{- include "stackweaver.customCA.volume" . | nindent 8 }}
       {{- with .Values.runner.nodeSelector }}
       nodeSelector:

@@ -532,6 +532,7 @@ path for air-gapped clusters, not just a "the Job will no-op" promise.
 {{- if not .Values.secrets.encryption.secretName }}{{- $needed = true -}}{{- end }}
 {{- if not .Values.secrets.zitadel.secretName }}{{- $needed = true -}}{{- end }}
 {{- if not .Values.secrets.oidc.secretName }}{{- $needed = true -}}{{- end }}
+{{- if not .Values.secrets.hosted.secretName }}{{- $needed = true -}}{{- end }}
 {{- if $needed }}true{{- end }}
 {{- end }}
 
@@ -557,3 +558,92 @@ if ($uri = {{ $site.basePath | quote }}) { return 308 {{ $site.basePath }}/; }
 rewrite ^{{ $site.basePath }}(/.*)$ $1 last;
 {{ end -}}
 {{- end -}}
+
+{{/* ── Launchers (#933) ─────────────────────────────────────────────── */}}
+
+{{- define "stackweaver.secrets.hosted" -}}
+{{- .Values.secrets.hosted.secretName | default (printf "%s-hosted" (include "stackweaver.fullname" .)) }}
+{{- end }}
+
+{{/* The launchers' own ServiceAccount, bound to the namespaced Role over the job namespace. */}}
+{{- define "stackweaver.launcher.serviceAccountName" -}}
+{{- printf "%s-launcher" (include "stackweaver.fullname" .) }}
+{{- end }}
+
+{{/* The namespace job pods run in: launcher.jobNamespace, else the release's. */}}
+{{- define "stackweaver.launcher.jobNamespace" -}}
+{{- .Values.launcher.jobNamespace | default .Release.Namespace }}
+{{- end }}
+
+{{/*
+The environment both launchers share: the API they register with as the deployment's hosted
+launcher, the hosted secret, and where and how they place job pods. No database, storage,
+Redis, encryption, OIDC signing or VCS app secret: the executor in each job pod fetches what its
+job needs from the API with a token for that job alone (AC1).
+*/}}
+{{- define "stackweaver.env.launcher" -}}
+- name: STACKWEAVER_SERVER
+  {{- /* Namespace-qualified: job pods in launcher.jobNamespace reach the API on this address too. */}}
+  value: {{ printf "http://%s-api.%s.svc:%v" (include "stackweaver.fullname" .) .Release.Namespace .Values.api.port | quote }}
+- name: STACKWEAVER_HOSTED
+  value: "1"
+- name: STACKWEAVER_HOSTED_SECRET
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "stackweaver.secrets.hosted" . }}
+      key: {{ .Values.secrets.hosted.keys.secret }}
+{{- if .Values.launcher.hostedGroup }}
+- name: STACKWEAVER_HOSTED_GROUP
+  value: {{ .Values.launcher.hostedGroup | quote }}
+{{- end }}
+{{- if .Values.launcher.hostedStrict }}
+- name: STACKWEAVER_HOSTED_STRICT
+  value: "1"
+{{- end }}
+- name: RUNNER_NAME
+  valueFrom:
+    fieldRef:
+      fieldPath: metadata.name
+- name: RUNNER_DRIVER
+  value: {{ .Values.launcher.driver | quote }}
+- name: RUNNER_NETWORK_MODE
+  value: {{ .Values.launcher.network | quote }}
+- name: RUNNER_JOB_NAMESPACE
+  value: {{ include "stackweaver.launcher.jobNamespace" . | quote }}
+- name: RUNNER_POD_TEMPLATE_CONFIGMAP
+  value: {{ printf "%s-launcher-pod-template" (include "stackweaver.fullname" .) | quote }}
+- name: RUNNER_MANAGE_NETWORK_POLICY
+  value: "false"
+{{- with .Values.launcher.runtimeClassName }}
+- name: RUNNER_RUNTIME_CLASS
+  value: {{ . | quote }}
+{{- end }}
+{{- with .Values.launcher.jobUID }}
+- name: RUNNER_JOB_UID
+  value: {{ . | quote }}
+{{- end }}
+{{- with .Values.launcher.keepFailedJobsFor }}
+- name: RUNNER_KEEP_FAILED_FOR
+  value: {{ . | quote }}
+{{- end }}
+- name: RUNNER_HEALTH_ADDR
+  value: {{ printf ":%v" .Values.launcher.healthPort | quote }}
+- name: HOME
+  value: /tmp
+{{- end }}
+
+{{/* The probes both launchers carry (AC75). */}}
+{{- define "stackweaver.launcher.probes" -}}
+livenessProbe:
+  httpGet:
+    path: /healthz
+    port: health
+  periodSeconds: 20
+  failureThreshold: 3
+readinessProbe:
+  httpGet:
+    path: /readyz
+    port: health
+  periodSeconds: 10
+  failureThreshold: 6
+{{- end }}
