@@ -27,6 +27,8 @@ spec:
     spec:
       {{- include "stackweaver.imagePullSecrets" . | nindent 6 }}
       serviceAccountName: {{ include "stackweaver.launcher.serviceAccountName" . }}
+      # Outlasts the launcher's drain, so a rollout lets its jobs finish (launcher.terminationGracePeriodSeconds).
+      terminationGracePeriodSeconds: {{ .Values.launcher.terminationGracePeriodSeconds }}
       securityContext:
         runAsNonRoot: true
         runAsUser: 1001
