@@ -327,6 +327,7 @@ The table below is generated from `values.yaml`. Boilerplate keys (resources, sc
 | launcher.network | string | `"platform"` | Job network: `platform` (node metadata blocked) or `host-identity` (the node's identity reachable) |
 | launcher.podTemplate | object | `{}` | Labels, annotations, nodeSelector, tolerations and priorityClassName merged into every job pod |
 | launcher.runtimeClassName | string | `""` | runtimeClassName of every job pod (`gvisor`, `kata`); empty uses the cluster default |
+| launcher.terminationGracePeriodSeconds | int | `390` | Seconds Kubernetes gives a launcher pod to stop on a rollout, a scale-down or a node drain before it kills it. A launcher drains: it waits up to its drain grace (`RUNNER_DRAIN_GRACE`, 5 minutes) for its jobs, stops what is left with a 60 s kill grace and deregisters, so this stays above both. Raise it when you raise `RUNNER_DRAIN_GRACE` in `runner.env` or `ansibleRunner.env`. |
 | nameOverride | string | `""` |  |
 | oidc.issuerUrl | string | `""` | Issuer URL for OIDC workload-identity tokens (non-secret) |
 | orchestrator.affinity | object | `{}` |  |

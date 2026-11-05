@@ -305,6 +305,11 @@ launcher:
   hostedStrict: false
   # -- Port of the launchers' /healthz and /readyz
   healthPort: 9090
+  # -- Seconds Kubernetes gives a launcher pod to stop on a rollout, a scale-down or a node drain
+  # before it kills it. A launcher drains: it waits up to its drain grace (`RUNNER_DRAIN_GRACE`,
+  # 5 minutes) for its jobs, stops what is left with a 60 s kill grace and deregisters, so this
+  # stays above both. Raise it when you raise `RUNNER_DRAIN_GRACE` in `runner.env` or `ansibleRunner.env`.
+  terminationGracePeriodSeconds: 390
 
 # -- OpenTofu launcher --
 runner:
