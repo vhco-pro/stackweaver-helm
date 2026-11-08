@@ -606,6 +606,11 @@ job needs from the API with a token for that job alone (AC1).
       fieldPath: metadata.name
 - name: RUNNER_DRIVER
   value: {{ .Values.launcher.driver | quote }}
+{{- /* Each engine's jobs run in that engine's job image (one-launcher spec, A3). */}}
+- name: RUNNER_TOFU_IMAGE
+  value: "{{ .Values.runner.image.repository }}:{{ .Values.runner.image.tag }}"
+- name: RUNNER_ANSIBLE_IMAGE
+  value: "{{ .Values.ansibleRunner.image.repository }}:{{ .Values.ansibleRunner.image.tag }}"
 - name: RUNNER_NETWORK_MODE
   value: {{ .Values.launcher.network | quote }}
 - name: RUNNER_JOB_NAMESPACE
