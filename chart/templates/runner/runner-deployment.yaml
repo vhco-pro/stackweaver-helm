@@ -51,8 +51,6 @@ spec:
             - name: LOG_LEVEL
               value: info
             {{- include "stackweaver.env.launcher" . | nindent 12 }}
-            - name: RUNNER_IMAGE
-              value: "{{ .Values.runner.image.repository }}:{{ .Values.runner.image.tag }}"
             - name: RUNNER_MAX_CONCURRENT_JOBS
               value: {{ .Values.runner.maxConcurrentJobs | default 4 | quote }}
             # ── Extra env vars (user overrides) ──

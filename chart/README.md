@@ -486,6 +486,8 @@ helm upgrade stackweaver ./deploy/helm/stackweaver \
 
 Auto-generated secrets are preserved. Pods are automatically restarted when ConfigMaps change (via checksum annotations).
 
+The launchers pull each job's job image (`runner.image` for OpenTofu runs, `ansibleRunner.image` for Ansible jobs and syncs) every time they place a job, including a pinned `runner.image.tag` or `ansibleRunner.image.tag`. If you pin either tag, make sure before upgrading that every node can reach the registry and is allowed to pull those images. Job pods do not use `global.imagePullSecrets`, so a private job image, such as `ghcr.io/vhco-pro/stackweaver-opentofu-runner`, needs a pull credential configured on the nodes.
+
 ## Uninstalling
 
 ```bash
