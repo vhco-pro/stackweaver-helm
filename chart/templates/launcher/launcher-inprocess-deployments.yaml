@@ -1,0 +1,21 @@
+{{/* launcher.driver=inprocess (one-launcher spec, A7, OD11, OD22): each job runs inside a launcher
+     pod, which needs that engine's toolchain, so the chart renders one launcher Deployment per
+     engine from that engine's job image, with RUNNER_ENGINES set. launcher.inprocess.opentofu and
+     .ansible override replicas, resources and scheduling; what they leave unset comes from the
+     shared launcher block. */}}
+{{- if eq .Values.launcher.driver "inprocess" }}
+{{- $l := include "stackweaver.launcher.values" . | fromYaml }}
+{{- $pull := dict "always" "Always" "missing" "IfNotPresent" "never" "Never" }}
+{{- range $engine, $runnerEngine := dict "opentofu" "tofu" "ansible" "ansible" }}
+{{- $o := get ($.Values.launcher.inprocess | default dict) $engine | default dict }}
+{{- $v := deepCopy $l }}
+{{- range $key := list "replicas" "resources" "nodeSelector" "tolerations" "affinity" }}
+{{- if hasKey $o $key }}
+{{- $_ := set $v $key (get $o $key) }}
+{{- end }}
+{{- end }}
+{{- $img := get $l.jobImages $engine }}
+---
+{{ include "stackweaver.launcher.deployment" (dict "root" $ "name" (printf "%s-launcher-%s" (include "stackweaver.fullname" $) $engine) "engine" $engine "engines" $runnerEngine "image" (printf "%s:%s" $img.repository $img.tag) "pullPolicy" (get $pull (include "stackweaver.launcher.jobImagePull" $)) "tmpSize" "4Gi" "values" $v) }}
+{{- end }}
+{{- end }}

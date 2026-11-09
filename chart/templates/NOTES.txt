@@ -29,6 +29,16 @@ To view a generated password:
 All secrets are managed externally. The chart did not create any Secret resources.
 {{- end }}
 
+{{- with include "stackweaver.launcher.legacyKeys" . }}
+
+── Deprecated launcher values ──
+
+One launcher now serves OpenTofu and Ansible. These runner.* and ansibleRunner.*
+values are deprecated and are translated onto it for two minor releases; move
+them under launcher:
+{{ . | trimPrefix "\n" }}
+{{- end }}
+
 {{- if .Release.IsUpgrade }}
 
 ── Upgrades ──
