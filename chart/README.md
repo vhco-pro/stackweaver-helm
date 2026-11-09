@@ -62,8 +62,8 @@ After install, follow the post-install notes (`helm get notes stackweaver -n sta
    ├── Redis 8        (job queue)
    ├── Garage         (S3-compatible storage)
    ├── Orchestrator   (job scheduler)
-   ├── Runner         (OpenTofu execution)
-   └── Ansible Runner (Ansible execution)
+   └── Launcher       (places OpenTofu runs, Ansible jobs and syncs
+                       in pods, each in its engine's job image)
 ```
 
 ## Ingress
@@ -172,8 +172,9 @@ The frontend reads `window.__STACKWEAVER__` from `env.js`, with fallback to Vite
 | API | `ghcr.io/vhco-pro/stackweaver-api` | `backend/Dockerfile` |
 | Frontend | `ghcr.io/vhco-pro/stackweaver-frontend` | `frontend/Dockerfile` (generic, no build args needed) |
 | Orchestrator | `ghcr.io/vhco-pro/stackweaver-orchestrator` | `backend/Dockerfile` |
-| Runner | `ghcr.io/vhco-pro/stackweaver-opentofu-runner` | `backend/Dockerfile` |
-| Ansible Runner | `ghcr.io/vhco-pro/stackweaver-ansible-runner` | `runner-images/ansible/Dockerfile` |
+| Launcher | `ghcr.io/vhco-pro/stackweaver-launcher` | `runner-images/launcher/Dockerfile` |
+| OpenTofu job image | `ghcr.io/vhco-pro/stackweaver-opentofu-runner` (`launcher.jobImages.opentofu`) | `runner-images/opentofu/Dockerfile` |
+| Ansible job image | `ghcr.io/vhco-pro/stackweaver-ansible-runner` (`launcher.jobImages.ansible`) | `runner-images/ansible/Dockerfile` |
 | Zitadel Init | `ghcr.io/vhco-pro/stackweaver-zitadel-init` | `scripts/zitadel-init/Dockerfile` |
 
 ## Bring Your Own Infrastructure
@@ -228,21 +229,6 @@ The table below is generated from `values.yaml`. Boilerplate keys (resources, sc
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| ansibleRunner.affinity | object | `{}` |  |
-| ansibleRunner.env | object | `{}` |  |
-| ansibleRunner.image.pullPolicy | string | `"IfNotPresent"` |  |
-| ansibleRunner.image.repository | string | `"ghcr.io/vhco-pro/stackweaver-ansible-runner"` | Ansible runner image repository |
-| ansibleRunner.image.tag | string | `"latest"` | Ansible runner image tag |
-| ansibleRunner.maxConcurrentJobs | int | `4` | Jobs and syncs each Ansible launcher runs at once, each in a pod of its own |
-| ansibleRunner.nodeSelector | object | `{}` |  |
-| ansibleRunner.podAnnotations | object | `{}` |  |
-| ansibleRunner.replicas | int | `1` | Ansible launcher replica count |
-| ansibleRunner.resources.limits.cpu | string | `"1"` |  |
-| ansibleRunner.resources.limits.memory | string | `"1Gi"` |  |
-| ansibleRunner.resources.requests.cpu | string | `"200m"` |  |
-| ansibleRunner.resources.requests.memory | string | `"256Mi"` |  |
-| ansibleRunner.runEnvPassthrough | list | `[]` | Names of extra runner variables (from `ansibleRunner.env`) to hand to Ansible jobs and syncs |
-| ansibleRunner.tolerations | list | `[]` |  |
 | api.affinity | object | `{}` |  |
 | api.auth.autoSubmitCode | bool | `false` | Auto-submit OTP forms when the full code is pasted |
 | api.auth.notificationMode | string | `"email"` | Auth code delivery: `email` (Zitadel delivers codes; the only production value) |
@@ -314,20 +300,43 @@ The table below is generated from `values.yaml`. Boilerplate keys (resources, sc
 | ingress.tls.authSecretName | string | `"stackweaver-auth-tls"` | TLS secret for the auth domain |
 | ingress.tls.enabled | bool | `true` | Enable TLS on both Ingress resources |
 | ingress.tls.secretName | string | `"stackweaver-tls"` | TLS secret for the app domain |
+| launcher.affinity | object | `{}` |  |
 | launcher.clusterCIDRs | list | `[]` | Pod and service CIDRs job pods may not reach, IPv4 and IPv6 (the API and DNS stay open) |
 | launcher.createJobNamespace | bool | `false` | Create `jobNamespace`, enforcing the restricted Pod Security Standard |
-| launcher.driver | string | `"kubernetes"` | Where jobs run: `kubernetes` (a pod per job) or `inprocess` (inside the launcher pod) |
+| launcher.driver | string | `"kubernetes"` | Where jobs run: `kubernetes` (a pod per job in its engine's job image) or `inprocess` (one launcher Deployment per engine, running each job inside its pod, from that engine's job image) |
+| launcher.env | object | `{}` | Extra environment variables of the launcher |
 | launcher.extraJobEgress | list | `[]` | Extra egress rules (NetworkPolicy `to` and `ports`) for job pods, appended as given: a destination inside clusterCIDRs that jobs must reach, such as an internal registry |
-| launcher.healthPort | int | `9090` | Port of the launchers' /healthz and /readyz |
+| launcher.healthPort | int | `9090` | Port of the launcher's /healthz and /readyz |
 | launcher.hostedGroup | string | `""` | Placement group the hosted launchers serve (`default` when empty) |
 | launcher.hostedStrict | bool | `false` | Refuse the in-process driver and the host-identity network (the SaaS setting) |
+| launcher.image.pullPolicy | string | `"IfNotPresent"` |  |
+| launcher.image.repository | string | `"ghcr.io/vhco-pro/stackweaver-launcher"` | Launcher image repository |
+| launcher.image.tag | string | `"latest"` | Launcher image tag |
+| launcher.inprocess.ansible | object | `{}` | Overrides of the in-process Ansible launcher Deployment |
+| launcher.inprocess.opentofu | object | `{}` | Overrides of the in-process OpenTofu launcher Deployment |
+| launcher.jobImages.ansible.repository | string | `"ghcr.io/vhco-pro/stackweaver-ansible-runner"` | Ansible job image repository |
+| launcher.jobImages.ansible.tag | string | `"latest"` | Ansible job image tag |
+| launcher.jobImages.opentofu.repository | string | `"ghcr.io/vhco-pro/stackweaver-opentofu-runner"` | OpenTofu job image repository |
+| launcher.jobImages.opentofu.tag | string | `"latest"` | OpenTofu job image tag |
+| launcher.jobImages.pullPolicy | string | `"Always"` | When job pods pull their job image: `Always` (a moved tag runs its current image), `IfNotPresent` or `Never` |
+| launcher.jobImages.pullSecrets | list | `[]` | dockerconfigjson Secrets (`- name: <secret>`) the launcher pulls private job images with, mounted into the launcher pod and copied per job into the job namespace; empty uses `global.imagePullSecrets` |
 | launcher.jobNamespace | string | `""` | Namespace job pods run in; empty uses the release namespace |
 | launcher.jobUID | int | `1001` | uid job pods run as when an image's user is not numeric |
 | launcher.keepFailedJobsFor | string | `""` | How long a failed job's pod is kept for inspection (`30m`); empty keeps none |
+| launcher.maxConcurrentJobs | int | `8` | Jobs and syncs each launcher runs at once, both engines sharing the slots, each in a pod of its own |
 | launcher.network | string | `"platform"` | Job network: `platform` (node metadata blocked) or `host-identity` (the node's identity reachable) |
+| launcher.nodeSelector | object | `{}` |  |
+| launcher.podAnnotations | object | `{}` |  |
 | launcher.podTemplate | object | `{}` | Labels, annotations, nodeSelector, tolerations and priorityClassName merged into every job pod |
+| launcher.replicas | int | `1` | Launcher replica count |
+| launcher.resources.limits.cpu | string | `"1"` |  |
+| launcher.resources.limits.memory | string | `"1Gi"` |  |
+| launcher.resources.requests.cpu | string | `"200m"` |  |
+| launcher.resources.requests.memory | string | `"256Mi"` |  |
+| launcher.runEnvPassthrough | list | `[]` | Names of extra launcher variables (from `launcher.env`) to hand to jobs and syncs |
 | launcher.runtimeClassName | string | `""` | runtimeClassName of every job pod (`gvisor`, `kata`); empty uses the cluster default |
-| launcher.terminationGracePeriodSeconds | int | `390` | Seconds Kubernetes gives a launcher pod to stop on a rollout, a scale-down or a node drain before it kills it. A launcher drains: it waits up to its drain grace (`RUNNER_DRAIN_GRACE`, 5 minutes) for its jobs, stops what is left with a 60 s kill grace and deregisters, so this stays above both. Raise it when you raise `RUNNER_DRAIN_GRACE` in `runner.env` or `ansibleRunner.env`. |
+| launcher.terminationGracePeriodSeconds | int | `390` | Seconds Kubernetes gives a launcher pod to stop on a rollout, a scale-down or a node drain before it kills it. A launcher drains: it waits up to its drain grace (`RUNNER_DRAIN_GRACE`, 5 minutes) for its jobs, stops what is left with a 60 s kill grace and deregisters, so this stays above both. Raise it when you raise `RUNNER_DRAIN_GRACE` in `launcher.env`. |
+| launcher.tolerations | list | `[]` |  |
 | nameOverride | string | `""` |  |
 | oidc.issuerUrl | string | `""` | Issuer URL for OIDC workload-identity tokens (non-secret) |
 | orchestrator.affinity | object | `{}` |  |
@@ -374,21 +383,6 @@ The table below is generated from `values.yaml`. Boilerplate keys (resources, sc
 | redis.resources.limits.memory | string | `"256Mi"` |  |
 | redis.resources.requests.cpu | string | `"50m"` |  |
 | redis.resources.requests.memory | string | `"64Mi"` |  |
-| runner.affinity | object | `{}` |  |
-| runner.env | object | `{}` |  |
-| runner.image.pullPolicy | string | `"IfNotPresent"` |  |
-| runner.image.repository | string | `"ghcr.io/vhco-pro/stackweaver-opentofu-runner"` | OpenTofu runner image repository |
-| runner.image.tag | string | `"latest"` | OpenTofu runner image tag |
-| runner.maxConcurrentJobs | int | `4` | Jobs each OpenTofu launcher runs at once, each in a pod of its own |
-| runner.nodeSelector | object | `{}` |  |
-| runner.podAnnotations | object | `{}` |  |
-| runner.replicas | int | `1` | OpenTofu launcher replica count |
-| runner.resources.limits.cpu | string | `"1"` |  |
-| runner.resources.limits.memory | string | `"1Gi"` |  |
-| runner.resources.requests.cpu | string | `"200m"` |  |
-| runner.resources.requests.memory | string | `"256Mi"` |  |
-| runner.runEnvPassthrough | list | `[]` | Names of extra runner variables (from `runner.env`) to hand to OpenTofu runs |
-| runner.tolerations | list | `[]` |  |
 | secrets.encryption.keys.key | string | `"encryption-key"` |  |
 | secrets.encryption.secretName | string | `""` | External encryption-key secret name; empty auto-generates a 32-byte hex key |
 | secrets.githubApp.keys.clientSecret | string | `"client-secret"` | Key holding the GitHub App's OAuth client secret. Connecting an installation asks the person to authorize the App and needs it, together with api.githubApp.clientId. |
@@ -486,7 +480,32 @@ helm upgrade stackweaver ./deploy/helm/stackweaver \
 
 Auto-generated secrets are preserved. Pods are automatically restarted when ConfigMaps change (via checksum annotations).
 
-The launchers pull each job's job image (`runner.image` for OpenTofu runs, `ansibleRunner.image` for Ansible jobs and syncs) every time they place a job, including a pinned `runner.image.tag` or `ansibleRunner.image.tag`. If you pin either tag, make sure before upgrading that every node can reach the registry and is allowed to pull those images. Job pods do not use `global.imagePullSecrets`, so a private job image, such as `ghcr.io/vhco-pro/stackweaver-opentofu-runner`, needs a pull credential configured on the nodes.
+Job pods pull their job image (`launcher.jobImages.opentofu` for OpenTofu runs, `launcher.jobImages.ansible` for Ansible jobs and syncs) as `launcher.jobImages.pullPolicy` says, `Always` by default, including a pinned tag. Every node must reach the registry. For a private job image, such as `ghcr.io/vhco-pro/stackweaver-opentofu-runner`, the launcher pulls with the dockerconfigjson Secrets of `launcher.jobImages.pullSecrets`, or `global.imagePullSecrets` when that is empty: it copies the matching registry's credential into a pull Secret of each job's own in the job namespace.
+
+### Upgrading to the chart version with one launcher
+
+Upgrade to chart 0.16.2 (Stackweaver 5.109.17) first, if you run an earlier chart: it is a required intermediate upgrade. That release gives the old `<release>-runner` and `<release>-ansible-runner` pods a termination grace above their drain grace, which the upgrade to one launcher relies on, because Helm deletes those Deployments and their pods stop with their own spec. Skipping it stops them after 30 seconds, and the Ansible jobs and applies running at that moment are lost.
+
+A launcher drains for up to `RUNNER_DRAIN_GRACE` (5 minutes by default) and then stops the jobs still running. To let longer jobs finish across an upgrade, raise `RUNNER_DRAIN_GRACE` in `launcher.env` and keep `launcher.terminationGracePeriodSeconds` above it plus the 60-second kill grace.
+
+### Deprecated launcher values
+
+One launcher Deployment, `<release>-launcher`, serves OpenTofu and Ansible. The `runner.*` and `ansibleRunner.*` values of the two launcher Deployments are deprecated. For two minor releases the chart translates them onto the launcher and lists each one it translated in the install notes. Move them under `launcher`:
+
+| Deprecated value | Translated to |
+|---|---|
+| `runner.image.repository`, `runner.image.tag` | `launcher.jobImages.opentofu.repository`, `.tag` |
+| `ansibleRunner.image.repository`, `ansibleRunner.image.tag` | `launcher.jobImages.ansible.repository`, `.tag` |
+| `runner.image.pullPolicy`, `ansibleRunner.image.pullPolicy` | `launcher.image.pullPolicy` |
+| `runner.replicas`, `ansibleRunner.replicas` | `launcher.replicas`, the largest of the three |
+| `runner.maxConcurrentJobs`, `ansibleRunner.maxConcurrentJobs` | `launcher.maxConcurrentJobs`, the two summed (an unset one counts as 4) |
+| `runner.env`, `ansibleRunner.env` | `launcher.env`, merged |
+| `runner.runEnvPassthrough`, `ansibleRunner.runEnvPassthrough` | `launcher.runEnvPassthrough`, merged |
+| `runner.podAnnotations`, `ansibleRunner.podAnnotations` | `launcher.podAnnotations`, merged |
+| `runner.nodeSelector`, `ansibleRunner.nodeSelector` | `launcher.nodeSelector`, merged |
+| `runner.tolerations`, `ansibleRunner.tolerations` | `launcher.tolerations`, appended |
+| `runner.resources`, `ansibleRunner.resources` | `launcher.resources` |
+| `runner.affinity`, `ansibleRunner.affinity` | `launcher.affinity` |
 
 ## Uninstalling
 

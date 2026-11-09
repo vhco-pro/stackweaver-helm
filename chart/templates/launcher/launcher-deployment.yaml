@@ -1,0 +1,9 @@
+{{/* The launcher (#933, D3, D4; one-launcher spec, A7): it registers as the deployment's hosted
+     launcher, holds one long-poll heartbeat and places every job it claims, OpenTofu or Ansible,
+     in a fresh pod of its own in the job namespace through the Kubernetes driver, in that engine's
+     job image. It holds no database, storage, Redis, encryption, OIDC signing or VCS app secret,
+     mounts no volume of jobs, and runs no user code. */}}
+{{- if ne .Values.launcher.driver "inprocess" }}
+{{- $l := include "stackweaver.launcher.values" . | fromYaml }}
+{{- include "stackweaver.launcher.deployment" (dict "root" . "name" (printf "%s-launcher" (include "stackweaver.fullname" .)) "engine" "" "engines" "" "image" (printf "%s:%s" $l.image.repository $l.image.tag) "pullPolicy" $l.image.pullPolicy "tmpSize" "256Mi" "values" $l) }}
+{{- end }}

@@ -273,12 +273,14 @@ orchestrator:
   githubApp:
     id: ""
     name: ""
-# ── Launchers ─────────────────────────────────────────────────────────────────
-# The OpenTofu and Ansible launchers place every job in a pod of its own in the job namespace
-# (#933). They hold no database, storage, Redis or platform secret; a job pod fetches what its
-# job needs from the API with a token for that job alone.
+# ── Launcher ──────────────────────────────────────────────────────────────────
+# One launcher serves OpenTofu and Ansible: it places every job in a pod of its own in the job
+# namespace, in that engine's job image (#933, one-launcher spec). It holds no database, storage,
+# Redis or platform secret; a job pod fetches what its job needs from the API with a token for that
+# job alone.
 launcher:
-  # -- Where jobs run: `kubernetes` (a pod per job) or `inprocess` (inside the launcher pod)
+  # -- Where jobs run: `kubernetes` (a pod per job in its engine's job image) or `inprocess` (one
+  # launcher Deployment per engine, running each job inside its pod, from that engine's job image)
   driver: kubernetes
   # -- Job network: `platform` (node metadata blocked) or `host-identity` (the node's identity reachable)
   network: platform
@@ -303,26 +305,23 @@ launcher:
   hostedGroup: ""
   # -- Refuse the in-process driver and the host-identity network (the SaaS setting)
   hostedStrict: false
-  # -- Port of the launchers' /healthz and /readyz
+  # -- Port of the launcher's /healthz and /readyz
   healthPort: 9090
   # -- Seconds Kubernetes gives a launcher pod to stop on a rollout, a scale-down or a node drain
   # before it kills it. A launcher drains: it waits up to its drain grace (`RUNNER_DRAIN_GRACE`,
   # 5 minutes) for its jobs, stops what is left with a 60 s kill grace and deregisters, so this
-  # stays above both. Raise it when you raise `RUNNER_DRAIN_GRACE` in `runner.env` or `ansibleRunner.env`.
+  # stays above both. Raise it when you raise `RUNNER_DRAIN_GRACE` in `launcher.env`.
   terminationGracePeriodSeconds: 390
-
-# -- OpenTofu launcher --
-runner:
   image:
-    # -- OpenTofu runner image repository
-    repository: ghcr.io/vhco-pro/stackweaver-opentofu-runner
-    # -- OpenTofu runner image tag
+    # -- Launcher image repository
+    repository: ghcr.io/vhco-pro/stackweaver-launcher
+    # -- Launcher image tag
     tag: latest
     pullPolicy: IfNotPresent
-  # -- OpenTofu launcher replica count
+  # -- Launcher replica count
   replicas: 1
-  # -- Jobs each OpenTofu launcher runs at once, each in a pod of its own
-  maxConcurrentJobs: 4
+  # -- Jobs and syncs each launcher runs at once, both engines sharing the slots, each in a pod of its own
+  maxConcurrentJobs: 8
   resources:
     requests:
       cpu: 200m
@@ -330,16 +329,44 @@ runner:
     limits:
       cpu: "1"
       memory: 1Gi
+  # -- Extra environment variables of the launcher
   env: {}
-  # Runs are handed only an allowlist of the launcher's own environment. List here the names
-  # of further variables, set in runner.env, that runs should receive. Names only, matched
+  # Jobs and syncs are handed only an allowlist of the launcher's own environment. List here the
+  # names of further variables, set in launcher.env, that they should receive. Names only, matched
   # exactly.
-  # -- Names of extra runner variables (from `runner.env`) to hand to OpenTofu runs
+  # -- Names of extra launcher variables (from `launcher.env`) to hand to jobs and syncs
   runEnvPassthrough: []
   podAnnotations: {}
   nodeSelector: {}
   tolerations: []
   affinity: {}
+  # The images jobs run in: a job that names no run image runs in its engine's job image, and a
+  # custom run image gets the executor copied from it.
+  jobImages:
+    opentofu:
+      # -- OpenTofu job image repository
+      repository: ghcr.io/vhco-pro/stackweaver-opentofu-runner
+      # -- OpenTofu job image tag
+      tag: latest
+    ansible:
+      # -- Ansible job image repository
+      repository: ghcr.io/vhco-pro/stackweaver-ansible-runner
+      # -- Ansible job image tag
+      tag: latest
+    # -- When job pods pull their job image: `Always` (a moved tag runs its current image), `IfNotPresent` or `Never`
+    pullPolicy: Always
+    # -- dockerconfigjson Secrets (`- name: <secret>`) the launcher pulls private job images with,
+    # mounted into the launcher pod and copied per job into the job namespace; empty uses
+    # `global.imagePullSecrets`
+    pullSecrets: []
+  # With `driver: inprocess`, the OpenTofu and the Ansible launcher Deployments: `replicas`,
+  # `resources`, `nodeSelector`, `tolerations` and `affinity` set here replace the shared values
+  # above for that engine.
+  inprocess:
+    # -- Overrides of the in-process OpenTofu launcher Deployment
+    opentofu: {}
+    # -- Overrides of the in-process Ansible launcher Deployment
+    ansible: {}
 
 # -- Secrets bootstrap job --
 # The secrets-init hook Job creates every secret you did not supply via secrets.*.secretName.
@@ -359,35 +386,6 @@ secretsInit:
     # -- Secrets-init image pull policy
     pullPolicy: IfNotPresent
 
-# -- Ansible launcher --
-ansibleRunner:
-  image:
-    # -- Ansible runner image repository
-    repository: ghcr.io/vhco-pro/stackweaver-ansible-runner
-    # -- Ansible runner image tag
-    tag: latest
-    pullPolicy: IfNotPresent
-  # -- Ansible launcher replica count
-  replicas: 1
-  # -- Jobs and syncs each Ansible launcher runs at once, each in a pod of its own
-  maxConcurrentJobs: 4
-  resources:
-    requests:
-      cpu: 200m
-      memory: 256Mi
-    limits:
-      cpu: "1"
-      memory: 1Gi
-  env: {}
-  # Jobs, inventory syncs and Galaxy installs are handed only an allowlist of the launcher's own
-  # environment. List here the names of further variables, set in ansibleRunner.env, that they
-  # should receive. Names only, matched exactly.
-  # -- Names of extra runner variables (from `ansibleRunner.env`) to hand to Ansible jobs and syncs
-  runEnvPassthrough: []
-  podAnnotations: {}
-  nodeSelector: {}
-  tolerations: []
-  affinity: {}
 # ── Storage ───────────────────────────────────────────────────────────────────
 # All data (state, configs, registry, logs, ansible artifacts) is stored in a
 # single S3-compatible bucket. Any S3-compatible service works: AWS S3, R2, B2,

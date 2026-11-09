@@ -576,12 +576,159 @@ rewrite ^{{ $site.basePath }}(/.*)$ $1 last;
 {{- end }}
 
 {{/*
-The environment both launchers share: the API they register with as the deployment's hosted
-launcher, the hosted secret, and where and how they place job pods. No database, storage,
+The launcher's values, as YAML for fromYaml: image, replicas, maxConcurrentJobs, resources, env,
+runEnvPassthrough, podAnnotations, nodeSelector, tolerations, affinity and jobImages. For two minor
+releases the runner.* and ansibleRunner.* values of the two-launcher chart are translated onto them
+(one-launcher spec, A7, OD6), and NOTES.txt lists each one (stackweaver.launcher.legacyKeys):
+runner.image and ansibleRunner.image feed the job images and their pullPolicy the launcher image's,
+env, runEnvPassthrough, podAnnotations, nodeSelector and tolerations merge into the launcher's, the
+larger replicas and the summed maxConcurrentJobs apply (an unset one at its old default 4), and an
+old resources or affinity replaces the launcher's.
+*/}}
+{{- define "stackweaver.launcher.values" -}}
+{{- $l := .Values.launcher -}}
+{{- $r := .Values.runner | default dict -}}
+{{- $a := .Values.ansibleRunner | default dict -}}
+{{- $ri := $r.image | default dict -}}
+{{- $ai := $a.image | default dict -}}
+{{- $jobImages := dict
+      "opentofu" (merge (pick $ri "repository" "tag") (deepCopy $l.jobImages.opentofu))
+      "ansible" (merge (pick $ai "repository" "tag") (deepCopy $l.jobImages.ansible)) -}}
+{{- $image := merge (dict "pullPolicy" ($ri.pullPolicy | default $ai.pullPolicy | default $l.image.pullPolicy)) (deepCopy $l.image) -}}
+{{- $replicas := max ($l.replicas | int) ($r.replicas | default 0 | int) ($a.replicas | default 0 | int) -}}
+{{- $jobs := $l.maxConcurrentJobs | int -}}
+{{- if or (hasKey $r "maxConcurrentJobs") (hasKey $a "maxConcurrentJobs") }}
+{{- $jobs = add ($r.maxConcurrentJobs | default 4 | int) ($a.maxConcurrentJobs | default 4 | int) -}}
+{{- end }}
+{{- dict
+      "image" $image
+      "replicas" $replicas
+      "maxConcurrentJobs" $jobs
+      "resources" ($r.resources | default $a.resources | default $l.resources)
+      "env" (merge (deepCopy ($l.env | default dict)) ($r.env | default dict) ($a.env | default dict))
+      "runEnvPassthrough" (concat ($l.runEnvPassthrough | default list) ($r.runEnvPassthrough | default list) ($a.runEnvPassthrough | default list) | uniq)
+      "podAnnotations" (merge (deepCopy ($l.podAnnotations | default dict)) ($r.podAnnotations | default dict) ($a.podAnnotations | default dict))
+      "nodeSelector" (merge (deepCopy ($l.nodeSelector | default dict)) ($r.nodeSelector | default dict) ($a.nodeSelector | default dict))
+      "tolerations" (concat ($l.tolerations | default list) ($r.tolerations | default list) ($a.tolerations | default list))
+      "affinity" ($r.affinity | default $a.affinity | default $l.affinity | default dict)
+      "jobImages" $jobImages
+    | toYaml }}
+{{- end }}
+
+{{/*
+The runner.* and ansibleRunner.* values a release still sets, one line each with where it went,
+for NOTES.txt (OD6); empty when it sets none.
+*/}}
+{{- define "stackweaver.launcher.legacyKeys" -}}
+{{- $to := dict
+      "image.repository" "launcher.jobImages.%s.repository"
+      "image.tag" "launcher.jobImages.%s.tag"
+      "image.pullPolicy" "launcher.image.pullPolicy"
+      "replicas" "launcher.replicas (the larger applies)"
+      "maxConcurrentJobs" "launcher.maxConcurrentJobs (the two are summed)"
+      "resources" "launcher.resources"
+      "env" "launcher.env (merged)"
+      "runEnvPassthrough" "launcher.runEnvPassthrough (merged)"
+      "podAnnotations" "launcher.podAnnotations (merged)"
+      "nodeSelector" "launcher.nodeSelector (merged)"
+      "tolerations" "launcher.tolerations (appended)"
+      "affinity" "launcher.affinity" -}}
+{{- range $old, $engine := dict "runner" "opentofu" "ansibleRunner" "ansible" }}
+{{- $vals := get $.Values $old | default dict }}
+{{- range $key := keys $vals | sortAlpha }}
+{{- $v := get $vals $key }}
+{{- $subkeys := list $key }}
+{{- if and (eq $key "image") (kindIs "map" $v) }}
+{{- $subkeys = list }}
+{{- range $sub := keys $v | sortAlpha }}
+{{- $subkeys = append $subkeys (printf "image.%s" $sub) }}
+{{- end }}
+{{- end }}
+{{- range $subkeys }}
+{{- if hasKey $to . }}
+{{- $dest := get $to . }}
+  {{ $old }}.{{ . }} -> {{ ternary (printf $dest $engine) $dest (contains "%s" $dest) }}
+{{- else }}
+  {{ $old }}.{{ . }} -> not translated; remove it
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
+
+{{/* A launcher's extra environment (launcher.env) and its passthrough list, given its values. */}}
+{{- define "stackweaver.launcher.extraEnv" -}}
+# ── Extra env vars (user overrides) ──
+{{- range $key, $value := .env }}
+- name: {{ $key }}
+  value: {{ $value | quote }}
+{{- end }}
+# ── Launcher variables handed to jobs beyond the built-in allowlist ──
+{{- with .runEnvPassthrough }}
+- name: STACKWEAVER_RUN_ENV_PASSTHROUGH
+  value: {{ join "," . | quote }}
+{{- end }}
+{{- end }}
+
+{{/* launcher.jobImages.pullPolicy as RUNNER_JOB_IMAGE_PULL (OD18). */}}
+{{- define "stackweaver.launcher.jobImagePull" -}}
+{{- $p := .Values.launcher.jobImages.pullPolicy | default "Always" -}}
+{{- $m := dict "Always" "always" "IfNotPresent" "missing" "Never" "never" -}}
+{{- if not (hasKey $m $p) }}
+{{- fail (printf "launcher.jobImages.pullPolicy=%s is not Always, IfNotPresent or Never" $p) }}
+{{- end }}
+{{- get $m $p }}
+{{- end }}
+
+{{/* The names of the dockerconfigjson Secrets the launcher pulls job images with, as a JSON list:
+launcher.jobImages.pullSecrets, else global.imagePullSecrets (OD19, OD26). */}}
+{{- define "stackweaver.launcher.registryAuth.secrets" -}}
+{{- $names := list -}}
+{{- range (.Values.launcher.jobImages.pullSecrets | default .Values.global.imagePullSecrets) }}
+{{- if kindIs "string" . }}
+{{- $names = append $names . }}
+{{- else }}
+{{- $names = append $names .name }}
+{{- end }}
+{{- end }}
+{{- $names | toJson }}
+{{- end }}
+
+{{/* Where the launcher reads its registry credential: one file per Secret (RUNNER_DOCKER_CONFIG). */}}
+{{- define "stackweaver.launcher.registryAuth.path" -}}/etc/stackweaver/registry-auth{{- end }}
+
+{{- define "stackweaver.launcher.registryAuth.volume" -}}
+{{- $names := include "stackweaver.launcher.registryAuth.secrets" . | fromJsonArray }}
+{{- if $names }}
+- name: registry-auth
+  projected:
+    sources:
+      {{- range $names }}
+      - secret:
+          name: {{ . }}
+          items:
+            - key: .dockerconfigjson
+              path: {{ . }}.json
+      {{- end }}
+{{- end }}
+{{- end }}
+
+{{- define "stackweaver.launcher.registryAuth.volumeMount" -}}
+{{- if include "stackweaver.launcher.registryAuth.secrets" . | fromJsonArray }}
+- name: registry-auth
+  mountPath: {{ include "stackweaver.launcher.registryAuth.path" . }}
+  readOnly: true
+{{- end }}
+{{- end }}
+
+{{/*
+The environment every launcher shares: the API it registers with as the deployment's hosted
+launcher, the hosted secret, and where and how it places job pods. No database, storage,
 Redis, encryption, OIDC signing or VCS app secret: the executor in each job pod fetches what its
 job needs from the API with a token for that job alone (AC1).
 */}}
 {{- define "stackweaver.env.launcher" -}}
+{{- $l := include "stackweaver.launcher.values" . | fromYaml }}
 - name: STACKWEAVER_SERVER
   {{- /* Namespace-qualified: job pods in launcher.jobNamespace reach the API on this address too. */}}
   value: {{ printf "http://%s-api.%s.svc:%v" (include "stackweaver.fullname" .) .Release.Namespace .Values.api.port | quote }}
@@ -608,9 +755,15 @@ job needs from the API with a token for that job alone (AC1).
   value: {{ .Values.launcher.driver | quote }}
 {{- /* Each engine's jobs run in that engine's job image (one-launcher spec, A3). */}}
 - name: RUNNER_TOFU_IMAGE
-  value: "{{ .Values.runner.image.repository }}:{{ .Values.runner.image.tag }}"
+  value: "{{ $l.jobImages.opentofu.repository }}:{{ $l.jobImages.opentofu.tag }}"
 - name: RUNNER_ANSIBLE_IMAGE
-  value: "{{ .Values.ansibleRunner.image.repository }}:{{ .Values.ansibleRunner.image.tag }}"
+  value: "{{ $l.jobImages.ansible.repository }}:{{ $l.jobImages.ansible.tag }}"
+- name: RUNNER_JOB_IMAGE_PULL
+  value: {{ include "stackweaver.launcher.jobImagePull" . | quote }}
+{{- if include "stackweaver.launcher.registryAuth.secrets" . | fromJsonArray }}
+- name: RUNNER_DOCKER_CONFIG
+  value: {{ include "stackweaver.launcher.registryAuth.path" . | quote }}
+{{- end }}
 - name: RUNNER_NETWORK_MODE
   value: {{ .Values.launcher.network | quote }}
 - name: RUNNER_JOB_NAMESPACE
@@ -637,7 +790,7 @@ job needs from the API with a token for that job alone (AC1).
   value: /tmp
 {{- end }}
 
-{{/* The probes both launchers carry (AC75). */}}
+{{/* The probes every launcher carries (AC75). */}}
 {{- define "stackweaver.launcher.probes" -}}
 livenessProbe:
   httpGet:
@@ -651,4 +804,106 @@ readinessProbe:
     port: health
   periodSeconds: 10
   failureThreshold: 6
+{{- end }}
+
+{{/*
+A launcher Deployment, given a dict: root (the chart's context), name, engine (the in-process
+engine label, empty for the Kubernetes-driver launcher), engines (RUNNER_ENGINES, or empty), image,
+pullPolicy, tmpSize, and values (stackweaver.launcher.values, with any per-engine overrides).
+*/}}
+{{- define "stackweaver.launcher.deployment" -}}
+{{- $root := .root }}
+{{- $l := .values }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .name }}
+  labels:
+    {{- include "stackweaver.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: launcher
+    {{- with .engine }}
+    stackweaver.io/launcher-engine: {{ . }}
+    {{- end }}
+spec:
+  replicas: {{ $l.replicas }}
+  selector:
+    matchLabels:
+      {{- include "stackweaver.selectorLabels" $root | nindent 6 }}
+      app.kubernetes.io/component: launcher
+      {{- with .engine }}
+      stackweaver.io/launcher-engine: {{ . }}
+      {{- end }}
+  template:
+    metadata:
+      labels:
+        {{- include "stackweaver.selectorLabels" $root | nindent 8 }}
+        app.kubernetes.io/component: launcher
+        {{- with .engine }}
+        stackweaver.io/launcher-engine: {{ . }}
+        {{- end }}
+      {{- with $l.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- include "stackweaver.imagePullSecrets" $root | nindent 6 }}
+      serviceAccountName: {{ include "stackweaver.launcher.serviceAccountName" $root }}
+      # Outlasts the launcher's drain, so a rollout lets its jobs finish (launcher.terminationGracePeriodSeconds).
+      terminationGracePeriodSeconds: {{ $root.Values.launcher.terminationGracePeriodSeconds }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: launcher
+          image: {{ .image | quote }}
+          imagePullPolicy: {{ .pullPolicy }}
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          ports:
+            - name: health
+              containerPort: {{ $root.Values.launcher.healthPort }}
+          env:
+            - name: LOG_LEVEL
+              value: info
+            {{- include "stackweaver.env.launcher" $root | nindent 12 }}
+            {{- with .engines }}
+            # The engine this launcher's toolchain serves (OD11).
+            - name: RUNNER_ENGINES
+              value: {{ . | quote }}
+            {{- end }}
+            - name: RUNNER_MAX_CONCURRENT_JOBS
+              value: {{ $l.maxConcurrentJobs | quote }}
+            {{- include "stackweaver.launcher.extraEnv" $l | nindent 12 }}
+          {{- include "stackweaver.launcher.probes" $root | nindent 10 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            {{- include "stackweaver.launcher.registryAuth.volumeMount" $root | nindent 12 }}
+            {{- include "stackweaver.customCA.volumeMount" $root | nindent 12 }}
+          resources:
+            {{- toYaml $l.resources | nindent 12 }}
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: {{ .tmpSize }}
+        {{- include "stackweaver.launcher.registryAuth.volume" $root | nindent 8 }}
+        {{- include "stackweaver.customCA.volume" $root | nindent 8 }}
+      {{- with $l.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $l.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $l.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
 {{- end }}
