@@ -444,6 +444,7 @@ The table below is generated from `values.yaml`. Boilerplate keys (resources, sc
 | storage.region | string | `"garage"` | S3 region (`garage` for the bundled store) |
 | storage.serviceAccountAnnotations | object | `{}` |  |
 | storage.useSSL | bool | `false` | Use TLS for S3 connections |
+| tofu.defaultVersion | string | `""` | Installation default OpenTofu version, used by every workspace whose workspace, project and organization set none. Empty = the version the published job image bakes; `latest` = the newest enabled, non-beta, non-deprecated catalogue version; or an exact version such as `1.13.1`. Before rolling the chart back to an image with an older engine, set this to the engine your workspaces last ran. |
 | tofu.releasesUrl | string | `""` | Base URL for OpenTofu release artifacts (empty = upstream GitHub releases) |
 | tofu.versionIndexUrl | string | `""` | URL of the OpenTofu version index (empty = https://get.opentofu.org/tofu/api.json) |
 | zitadel.bundled | bool | `true` | Deploy bundled Zitadel (`false` uses `zitadel.external`) |

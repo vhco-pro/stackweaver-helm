@@ -570,6 +570,12 @@ tofu:
   releasesUrl: ""
   # -- URL of the OpenTofu version index (empty = https://get.opentofu.org/tofu/api.json)
   versionIndexUrl: ""
+  # -- Installation default OpenTofu version, used by every workspace whose workspace, project and
+  # organization set none. Empty = the version the published job image bakes; `latest` = the newest
+  # enabled, non-beta, non-deprecated catalogue version; or an exact version such as `1.13.1`.
+  # Before rolling the chart back to an image with an older engine, set this to the engine your
+  # workspaces last ran.
+  defaultVersion: ""
 # ── OIDC Workload Identity ───────────────────────────────────────────────────
 oidc:
   # Issuer URL for OIDC workload identity tokens (non-secret, can be left empty)
