@@ -550,6 +550,7 @@ path for air-gapped clusters, not just a "the Job will no-op" promise.
 {{- $site := include "stackweaver.publicSite.values" . | fromJson -}}
 # Generated deployment settings. Mount at /etc/nginx/public-site-settings.conf.
 set $sw_site_url {{ $site.url | quote }};
+set $sw_contact_opt_in "0";
 set $sw_base_path {{ $site.basePath | quote }};
 set $sw_noindex {{ ternary "" "noindex, nofollow" $site.indexing | quote }};
 set $sw_sitemap_line {{ ternary (printf "Sitemap: %s/sitemap.xml" $site.url) "" $site.indexing | quote }};
