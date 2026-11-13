@@ -269,6 +269,10 @@ spec:
             - name: TOFU_RELEASES_URL
               value: {{ .Values.tofu.releasesUrl | quote }}
             {{- end }}
+            {{- if .Values.tofu.defaultVersion }}
+            - name: TOFU_DEFAULT_VERSION
+              value: {{ .Values.tofu.defaultVersion | quote }}
+            {{- end }}
             {{- if .Values.tofu.versionIndexUrl }}
             - name: TOFU_VERSION_INDEX_URL
               value: {{ .Values.tofu.versionIndexUrl | quote }}
