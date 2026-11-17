@@ -98,7 +98,7 @@ PostgreSQL username
 {{- if .Values.postgresql.enabled }}
 {{- .Values.postgresql.auth.username }}
 {{- else }}
-{{- .Values.postgresql.external.username | default "iac" }}
+{{- .Values.postgresql.external.username | default "stackweaver" }}
 {{- end }}
 {{- end }}
 
@@ -109,7 +109,7 @@ PostgreSQL database
 {{- if .Values.postgresql.enabled }}
 {{- .Values.postgresql.auth.database }}
 {{- else }}
-{{- .Values.postgresql.external.database | default "iac_platform" }}
+{{- .Values.postgresql.external.database | default "stackweaver" }}
 {{- end }}
 {{- end }}
 

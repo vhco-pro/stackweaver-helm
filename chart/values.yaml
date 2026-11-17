@@ -423,9 +423,9 @@ postgresql:
     tag: "17"
   auth:
     # -- Bundled PostgreSQL username
-    username: iac
+    username: stackweaver
     # -- Bundled PostgreSQL database name
-    database: iac_platform
+    database: stackweaver
   storage:
     # -- PostgreSQL PVC size
     size: 10Gi
