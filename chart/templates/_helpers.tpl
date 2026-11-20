@@ -387,6 +387,27 @@ nginx.org/client-max-body-size: "10m"
 {{- end }}
 {{- end }}
 
+{{/*
+Public ingress annotations: the global ingress annotations merged with ingress.public.annotations,
+which win on a shared key.
+The public Ingress routes Exact paths only, so it needs no provider preset.
+*/}}
+{{- define "stackweaver.ingress.publicAnnotations" -}}
+{{- $merged := mergeOverwrite (deepCopy (.Values.ingress.annotations | default dict)) (deepCopy (.Values.ingress.public.annotations | default dict)) }}
+{{- with $merged }}
+{{ toYaml . }}
+{{- end }}
+{{- end }}
+
+{{/*
+Origin of the public host (ingress.public.host), the base Azure DevOps webhooks are registered
+on and, with ingress.public.oidcDiscovery, the default workload identity issuer.
+*/}}
+{{- define "stackweaver.public.url" -}}
+{{- $scheme := ternary "https" "http" .Values.ingress.tls.enabled }}
+{{- printf "%s://%s" $scheme .Values.ingress.public.host }}
+{{- end }}
+
 {{/* ── Common env-var snippets (reused across deployments) ────────────── */}}
 
 {{/*
