@@ -297,6 +297,11 @@ The table below is generated from `values.yaml`. Boilerplate keys (resources, sc
 | ingress.hosts.app | string | `"stackweaver.example.com"` | App domain (Frontend + API) |
 | ingress.hosts.auth | string | `"auth.stackweaver.example.com"` | Auth domain (Zitadel + Login UI) |
 | ingress.provider | string | `"nginx-inc"` | Ingress controller provider; selects annotation presets (`nginx-inc` | `community-nginx` | `traefik` | `none`) |
+| ingress.public.annotations | object | `{}` | Annotations for the public Ingress, merged on top of `ingress.annotations` |
+| ingress.public.className | string | `""` | IngressClass for the public Ingress, for example an internet-facing controller. Empty uses `ingress.className` |
+| ingress.public.host | string | `""` | Public host for the webhook receivers (and, with `oidcDiscovery`, the workload identity discovery document and JWKS). Empty renders no public Ingress. When set, the API's `STACKWEAVER_WEBHOOK_BASE_URL` defaults to this host's origin |
+| ingress.public.oidcDiscovery | bool | `false` | Also route `/.well-known/openid-configuration` and `/.well-known/jwks` on the public host, for per-resource federation. When `oidc.issuerUrl` is empty, the issuer defaults to the public host's origin |
+| ingress.public.tlsSecretName | string | `"stackweaver-public-tls"` | TLS secret for the public host (used when `ingress.tls.enabled`) |
 | ingress.tls.authSecretName | string | `"stackweaver-auth-tls"` | TLS secret for the auth domain |
 | ingress.tls.enabled | bool | `true` | Enable TLS on both Ingress resources |
 | ingress.tls.secretName | string | `"stackweaver-tls"` | TLS secret for the app domain |

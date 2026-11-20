@@ -59,6 +59,20 @@ ingress:
     app: stackweaver.example.com
     # -- Auth domain (Zitadel + Login UI)
     auth: auth.stackweaver.example.com
+  # A separate Ingress for a public host that serves only what outside services must call:
+  # the Azure DevOps and GitHub App webhook receivers and, with oidcDiscovery, the workload
+  # identity discovery document and JWKS. The app and auth hosts can then stay internal.
+  public:
+    # -- Public host for the webhook receivers (and, with `oidcDiscovery`, the workload identity discovery document and JWKS). Empty renders no public Ingress. When set, the API's `STACKWEAVER_WEBHOOK_BASE_URL` defaults to this host's origin
+    host: ""
+    # -- Also route `/.well-known/openid-configuration` and `/.well-known/jwks` on the public host, for per-resource federation. When `oidc.issuerUrl` is empty, the issuer defaults to the public host's origin
+    oidcDiscovery: false
+    # -- IngressClass for the public Ingress, for example an internet-facing controller. Empty uses `ingress.className`
+    className: ""
+    # -- Annotations for the public Ingress, merged on top of `ingress.annotations`
+    annotations: {}
+    # -- TLS secret for the public host (used when `ingress.tls.enabled`)
+    tlsSecretName: stackweaver-public-tls
 # ── External Secrets ──────────────────────────────────────────────────────────
 #
 # For each component, you can either:

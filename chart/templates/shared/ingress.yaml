@@ -143,3 +143,50 @@ spec:
                   number: 8080
 {{- end }}
 {{- end }}
+{{- if and .Values.ingress.enabled .Values.ingress.public.host }}
+{{- if or (eq .Values.ingress.public.host .Values.ingress.hosts.app) (eq .Values.ingress.public.host .Values.ingress.hosts.auth) }}
+{{- fail "ingress.public.host must differ from ingress.hosts.app and ingress.hosts.auth: the public host serves only the webhook and discovery paths" }}
+{{- end }}
+---
+# ── Public Ingress (webhook receivers, optional workload identity discovery) ──
+# Serves only the paths outside services must call, so the app and auth hosts can stay
+# internal. Every path is Exact: nothing else of the API or the SPA is reachable here.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "stackweaver.fullname" . }}-public
+  labels:
+    {{- include "stackweaver.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ingress-public
+  {{- with (include "stackweaver.ingress.publicAnnotations" . | trim) }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- with (.Values.ingress.public.className | default .Values.ingress.className) }}
+  ingressClassName: {{ . }}
+  {{- end }}
+  {{- if .Values.ingress.tls.enabled }}
+  tls:
+    - hosts:
+        - {{ .Values.ingress.public.host | quote }}
+      secretName: {{ .Values.ingress.public.tlsSecretName }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.ingress.public.host | quote }}
+      http:
+        paths:
+          {{- $paths := list "/api/v2/vcs-connections/azure-devops/webhook" "/api/v2/vcs-connections/github/webhook" }}
+          {{- if .Values.ingress.public.oidcDiscovery }}
+          {{- $paths = concat $paths (list "/.well-known/openid-configuration" "/.well-known/jwks") }}
+          {{- end }}
+          {{- range $paths }}
+          - path: {{ . }}
+            pathType: Exact
+            backend:
+              service:
+                name: {{ include "stackweaver.fullname" $ }}-api
+                port:
+                  number: {{ $.Values.api.port }}
+          {{- end }}
+{{- end }}

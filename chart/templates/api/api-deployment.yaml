@@ -199,9 +199,15 @@ spec:
                   optional: true
             {{- end }}
             # ── OIDC Workload Identity ──
-            {{- if .Values.oidc.issuerUrl }}
+            {{- if hasKey .Values.api.env "OIDC_ISSUER_URL" }}
+            {{- /* api.env sets it below and wins over oidc.issuerUrl and the public default */}}
+            {{- else if .Values.oidc.issuerUrl }}
             - name: OIDC_ISSUER_URL
               value: {{ .Values.oidc.issuerUrl | quote }}
+            {{- else if and .Values.ingress.enabled .Values.ingress.public.host .Values.ingress.public.oidcDiscovery }}
+            # The public Ingress serves the discovery document and JWKS, so the issuer is its origin.
+            - name: OIDC_ISSUER_URL
+              value: {{ include "stackweaver.public.url" . | quote }}
             {{- end }}
             - name: OIDC_SIGNING_KEY
               valueFrom:
@@ -282,6 +288,12 @@ spec:
             # nothing of the chart's, so this is how it trusts an internal registry or mirror.
             - name: STACKWEAVER_JOB_CA_FILE
               value: /etc/ssl/certs/custom-ca.crt
+            {{- end }}
+            {{- if and .Values.ingress.enabled .Values.ingress.public.host (not (hasKey .Values.api.env "STACKWEAVER_WEBHOOK_BASE_URL")) }}
+            # ── Azure DevOps service hooks are registered on the public host, the one Azure
+            #    DevOps can reach ──
+            - name: STACKWEAVER_WEBHOOK_BASE_URL
+              value: {{ include "stackweaver.public.url" . | quote }}
             {{- end }}
             # ── Extra env vars (user overrides) ──
             {{- range $key, $value := .Values.api.env }}
