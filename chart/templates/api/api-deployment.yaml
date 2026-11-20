@@ -167,6 +167,15 @@ spec:
             #    relay, and by status check links) ──
             - name: STACKWEAVER_APP_URL
               value: {{ include "stackweaver.app.url" . | quote }}
+            # ── The API's public origin: the OIDC discovery document's issuer and endpoints are
+            #    built from it, never from a forwarding header, and its host is trusted. A relative
+            #    API URL is served under the app origin, so it resolves against that ──
+            {{- if not (hasKey .Values.api.env "STACKWEAVER_PUBLIC_URL") }}
+            {{- $apiURL := urlParse (include "stackweaver.api.url" .) }}
+            {{- $appURL := urlParse (include "stackweaver.app.url" .) }}
+            - name: STACKWEAVER_PUBLIC_URL
+              value: {{ printf "%s://%s" ($apiURL.scheme | default $appURL.scheme) ($apiURL.host | default $appURL.host) | quote }}
+            {{- end }}
             # ── Private registry host: the API's public host, which module sources name and a
             #    job's registry token is minted for ──
             {{- if not (hasKey .Values.api.env "STACKWEAVER_REGISTRY_HOST") }}
