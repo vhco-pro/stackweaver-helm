@@ -476,7 +476,200 @@ The table below is generated from `values.yaml`. Boilerplate keys (resources, sc
 
 ## Upgrading
 
+The API Deployment uses the Kubernetes RollingUpdate default. For this first release,
+prepare native Recreate at the unchanged source version before every upgrade, including
+intermediate hops. Earlier or unidentified source APIs need that transition before the
+target migrates the database. Follow the ordered
+[API strategy procedure](../../../docs/get-started/self-hosting/kubernetes/README.md#api-strategy-transition)
+with Helm 3, minimum 3.12. It records namespace, rendered API name, Helm owner, Deployment
+UID and original live/desired strategy before changing versions. The native merge patch
+uses `type: Recreate` and `rollingUpdate: null`.
+
+Recreate causes an API outage during image pull and startup. Use a quiet maintenance window,
+finish active jobs and pause incoming work first. An older executor whose job finishes during
+the outage can lose its completion report. Upgrade the API, launchers and job images together.
+The verified fixed API component version will be documented after publication, separately
+from chart versions and monorepo/source tags.
+
+### Verify the stopped source database inventory
+
+Use this read-only check for a verified Stackweaver `5.109.17` or `5.116.0`
+source while the source API and orchestrator are stopped and the target writer
+is held. Confirm the actual database endpoint and name from the recorded source
+installation before running the query. Use the same PostgreSQL access you use
+for the backup. The query checks database rows. Verify launcher identities and
+writer termination separately through the deployment procedure.
+
+Copy the SQL below to `source-inventory.sql`. Set the following values from the
+source record taken before stopping the API.
+
+- `SOURCE_DATABASE` is the verified source database name on your
+  configured `psql` connection.
+- `SOURCE_RUNNERS_JSON` is a JSON array of source registration records.
+  Each record has `id`, `name`, `kind` (`hosted` or `customer`),
+  `hosted_group`, `organization_id`, `agent_pool_id` and
+  `runner_api_key_id`. Use JSON null for nullable database values. Empty and null hosted groups match.
+  The last field is the credential row UUID. Keep the bearer token out of the file.
+- `SOURCE_HOSTED_CLAIMS_JSON` is a JSON array of verified hosted claims
+  permitted to survive the staged API change. Each has `kind` (`tofu`,
+  `ansible` or `work_item`), `id`, `runner_id`, `attempt` and `phase`.
+  Use `plan` or `apply` for OpenTofu and an empty string for the other kinds.
+  Use `[]` when there are no such claims.
+- `UPGRADE_MODE` is `quiesced` when every active claim must finish and
+  `staged` only when following a staged procedure that permits a verified
+  hosted claim to finish after target readiness.
+
+```bash
+psql -X -qAt \
+  -v source_database="$SOURCE_DATABASE" \
+  -v source_runners="$SOURCE_RUNNERS_JSON" \
+  -v source_hosted_claims="$SOURCE_HOSTED_CLAIMS_JSON" \
+  -v upgrade_mode="$UPGRADE_MODE" \
+  -f source-inventory.sql
+```
+
+```sql
+\set ON_ERROR_STOP on
+BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY;
+SET LOCAL search_path = pg_catalog, public;
+SET LOCAL lock_timeout = '5s';
+SET LOCAL statement_timeout = '30s';
+
+WITH expected_registrations AS (
+  SELECT * FROM jsonb_to_recordset(:'source_runners'::jsonb)
+    AS r(id uuid, name text, kind text, hosted_group text, organization_id uuid,
+         agent_pool_id uuid, runner_api_key_id uuid)
+),
+expected_hosted_claims AS (
+  SELECT * FROM jsonb_to_recordset(:'source_hosted_claims'::jsonb)
+    AS c(kind text, id text, runner_id uuid, attempt int, phase text)
+),
+observed_registrations AS (
+  SELECT r.id, r.name, r.kind, r.hosted_group, r.organization_id, r.agent_pool_id,
+         CASE WHEN keys.live_count = 1 THEN keys.live_id
+              ELSE NULL END AS runner_api_key_id,
+         keys.live_count,
+         (keys.live_count > 1 OR
+          (r.runner_api_key_id IS NOT NULL
+           AND keys.live_id IS DISTINCT FROM r.runner_api_key_id)) AS uncertain_key
+  FROM public.runners r
+  CROSS JOIN LATERAL (
+    SELECT COUNT(*) AS live_count, (array_agg(k.id ORDER BY k.id))[1] AS live_id
+    FROM public.api_keys k
+    WHERE (k.expires_at IS NULL OR k.expires_at > CURRENT_TIMESTAMP)
+      AND ((r.kind = 'hosted' AND k.kind = 'hosted' AND k.organization_id IS NULL
+            AND k.agent_pool_id IS NULL AND k.user_id IS NULL)
+        OR (r.kind = 'customer' AND k.kind = 'org' AND k.organization_id = r.organization_id
+            AND (k.agent_pool_id IS NULL OR k.agent_pool_id = r.agent_pool_id)))
+      AND k.scopes <> '[]'::jsonb
+      AND jsonb_build_array('runner:' || r.id::text || ':heartbeat',
+                           'runner:' || r.id::text || ':jobs') @> k.scopes
+  ) keys
+),
+registrations AS (
+  SELECT COALESCE(r.id, e.id)::text AS id
+  FROM observed_registrations r FULL JOIN expected_registrations e ON r.id = e.id
+  WHERE r.id IS NULL OR e.id IS NULL OR r.uncertain_key
+     OR ROW(r.name, r.kind, NULLIF(r.hosted_group, ''), r.organization_id, r.agent_pool_id, r.runner_api_key_id)
+        IS DISTINCT FROM ROW(e.name, e.kind, NULLIF(e.hosted_group, ''), e.organization_id, e.agent_pool_id, e.runner_api_key_id)
+),
+work AS (
+  SELECT 'tofu' AS kind, id, runner_id, attempt, claimed_phase AS phase,
+         dispatched_at IS NULL AND status IN ('pending', 'pre_plan_completed', 'applying') AS reserved,
+         false AS capture, status IN ('planning', 'running', 'applying') AS running
+  FROM public.runs
+  WHERE (runner_id IS NOT NULL AND dispatched_at IS NULL AND status IN ('pending', 'pre_plan_completed', 'applying'))
+     OR (dispatched_at IS NOT NULL AND status IN ('pending', 'pre_plan_completed', 'applying'))
+     OR status IN ('planning', 'running')
+  UNION ALL
+  SELECT 'ansible', id::text, runner_id, attempt, '',
+         status = 'pending' AND started_at IS NULL, false, status = 'running'
+  FROM public.ansible_jobs
+  WHERE status = 'running' OR (status = 'pending' AND runner_id IS NOT NULL)
+  UNION ALL
+  SELECT 'work_item', id, runner_id, attempt, '',
+         status = 'pending' AND started_at IS NULL, kind = 'playbook_snapshot', status = 'running'
+  FROM public.work_items
+  WHERE status = 'running' OR (status = 'pending' AND runner_id IS NOT NULL)
+     OR (kind = 'playbook_snapshot' AND runner_id IS NOT NULL AND started_at IS NOT NULL AND finished_at IS NULL)
+),
+dispositions AS (
+  SELECT 'unexpected_registration' AS disposition, 'runner' AS kind, id FROM registrations
+  UNION ALL
+  SELECT CASE
+      WHEN w.reserved THEN 'reservation'
+      WHEN w.capture THEN 'active_capture'
+      WHEN w.running AND e.id IS NOT NULL AND r.kind = 'hosted' AND r.organization_id IS NULL
+           AND r.agent_pool_id IS NULL AND r.live_count = 1
+           AND NOT EXISTS (SELECT 1 FROM registrations changed WHERE changed.id = w.runner_id::text)
+           THEN 'matched_hosted_claim'
+      ELSE 'unexpected_claim'
+    END, w.kind, w.id
+  FROM work w
+  LEFT JOIN expected_hosted_claims e USING (kind, id, runner_id, attempt, phase)
+  LEFT JOIN observed_registrations r ON r.id = w.runner_id
+),
+input_check AS (
+  SELECT current_database() = :'source_database'
+    AND :'upgrade_mode' IN ('staged', 'quiesced')
+    AND NOT EXISTS (
+      SELECT 1 FROM expected_registrations
+      WHERE id IS NULL OR COALESCE(btrim(name), '') = ''
+         OR kind IS NULL OR kind NOT IN ('hosted', 'customer')
+    )
+    AND NOT EXISTS (
+      SELECT id FROM expected_registrations GROUP BY id HAVING count(*) > 1
+    )
+    AND NOT EXISTS (
+      SELECT 1 FROM expected_hosted_claims
+      WHERE kind IS NULL OR kind NOT IN ('tofu', 'ansible', 'work_item')
+         OR COALESCE(btrim(id), '') = '' OR runner_id IS NULL
+         OR attempt IS NULL OR attempt <= 0 OR phase IS NULL
+         OR (kind = 'tofu' AND phase NOT IN ('plan', 'apply'))
+         OR (kind <> 'tofu' AND phase <> '')
+    )
+    AND NOT EXISTS (
+      SELECT kind, id FROM expected_hosted_claims GROUP BY kind, id HAVING count(*) > 1
+    ) AS valid
+)
+SELECT CASE
+  WHEN NOT input_check.valid THEN jsonb_build_object('status', 'unavailable')
+  ELSE jsonb_build_object(
+    'status', CASE WHEN EXISTS (
+      SELECT 1 FROM dispositions
+      WHERE disposition <> 'matched_hosted_claim' OR :'upgrade_mode' = 'quiesced'
+    ) THEN 'blocked' ELSE 'clear' END,
+    'registrations', COALESCE(
+      (SELECT jsonb_agg(to_jsonb(r) - 'live_count' ORDER BY r.id) FROM observed_registrations r),
+      '[]'::jsonb
+    ),
+    'inventory', COALESCE(
+      (SELECT jsonb_agg(to_jsonb(d) ORDER BY disposition, kind, id) FROM dispositions d),
+      '[]'::jsonb
+    )
+  )
+END
+FROM input_check;
+COMMIT;
+```
+
+For discovery, set both JSON inputs to `[]`. The `registrations` array lists
+the launcher identities and scoped credential row IDs observed in the verified
+database. Reconcile those identities against the installed workloads and verify
+the live launcher authorization separately. Keep the transition held while a
+registration has `uncertain_key: true`. Use the verified registrations as input
+to the final check after the source writers stop.
+
+The command prints one JSON report. A `blocked` result lists captures,
+reservations, unexpected claims or changed registrations to reconcile.
+`quiesced` also blocks on known work that is still running. Treat a command
+error, invalid output or an `unavailable` result as a hold. A `clear` result
+satisfies the database inventory check. Complete the remaining deployment
+checks before starting the target API.
+
 Back up PostgreSQL and the object storage bucket before upgrading to the chart version that introduces the launchers. That upgrade is forward-only: the database cannot be downgraded in place, and rolling back is a restore of both backups together with the previous chart version, not a `helm rollback`.
+
+After source preparation passes, apply the target with Recreate retained.
 
 ```bash
 helm upgrade stackweaver ./deploy/helm/stackweaver \
@@ -484,9 +677,191 @@ helm upgrade stackweaver ./deploy/helm/stackweaver \
   -f my-values.yaml
 ```
 
+Restore and verify the captured original strategy only after target readiness or completed
+matching-backup recovery, against the same recorded Deployment UID and Helm installation.
+Keep the restoration record and prepared strategy after a failure. Local Kustomize, Argo CD
+and Flux installations follow their staged
+[desired-configuration procedure](../../../docs/get-started/self-hosting/kubernetes/kustomize/README.md#api-upgrades),
+preserving their apply mode and controller settings through reconciliation and restoration.
+
 Auto-generated secrets are preserved. Pods are automatically restarted when ConfigMaps change (via checksum annotations).
 
 Job pods pull their job image (`launcher.jobImages.opentofu` for OpenTofu runs, `launcher.jobImages.ansible` for Ansible jobs and syncs) as `launcher.jobImages.pullPolicy` says, `Always` by default, including a pinned tag. Every node must reach the registry. For a private job image, such as `ghcr.io/vhco-pro/stackweaver-opentofu-runner`, the launcher pulls with the dockerconfigjson Secrets of `launcher.jobImages.pullSecrets`, or `global.imagePullSecrets` when that is empty: it copies the matching registry's credential into a pull Secret of each job's own in the job namespace.
+
+### Inspect launcher work on the staged target database
+
+Run this check after the staged target API is ready, while registration and new work
+remain paused. Use the recorded source registration list from the preceding check
+and connect to the verified target database with your backup administrator account.
+Copy the following SQL into `target-inventory.sql`.
+
+```bash
+psql -X -qAt \
+  -v target_database="$TARGET_DATABASE" \
+  -v source_runners="$SOURCE_RUNNERS_JSON" \
+  -f target-inventory.sql
+```
+
+A `blocked` result lists active claims, reservations or canceled attempts awaiting
+settlement. An `unavailable` result or a failed query leaves cutover on hold. A
+`clear` result confirms the recorded database inventory is empty. Verify launcher
+process termination and controller ownership separately before advancing. The query
+prints work and registration IDs without returning credentials.
+
+```sql
+\set ON_ERROR_STOP on
+BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY;
+SET LOCAL search_path = pg_catalog, public;
+SET LOCAL lock_timeout = '5s';
+SET LOCAL statement_timeout = '30s';
+
+-- Confirm the snapshot assignment migration is present without reading job data.
+SELECT playbook_snapshot_upload_id FROM ansible_jobs WHERE FALSE;
+
+WITH expected AS (
+  SELECT *
+  FROM jsonb_to_recordset(:'source_runners'::jsonb)
+    AS r(id uuid, name text, kind text, hosted_group text, organization_id uuid,
+         agent_pool_id uuid, runner_api_key_id uuid)
+),
+observed_registrations AS (
+  SELECT r.id, r.name, r.kind, r.hosted_group, r.organization_id, r.agent_pool_id,
+         CASE WHEN keys.live_count = 1 THEN keys.live_id
+              ELSE NULL END AS runner_api_key_id,
+         keys.live_count,
+         (keys.live_count > 1 OR
+          (r.runner_api_key_id IS NOT NULL
+           AND keys.live_id IS DISTINCT FROM r.runner_api_key_id)) AS uncertain_key
+  FROM public.runners r
+  CROSS JOIN LATERAL (
+    SELECT COUNT(*) AS live_count, (array_agg(k.id ORDER BY k.id))[1] AS live_id
+    FROM public.api_keys k
+    WHERE (k.expires_at IS NULL OR k.expires_at > CURRENT_TIMESTAMP)
+      AND ((r.kind = 'hosted' AND k.kind = 'hosted' AND k.organization_id IS NULL
+            AND k.agent_pool_id IS NULL AND k.user_id IS NULL)
+        OR (r.kind = 'customer' AND k.kind = 'org' AND k.organization_id = r.organization_id
+            AND (k.agent_pool_id IS NULL OR k.agent_pool_id = r.agent_pool_id)))
+      AND k.scopes <> '[]'::jsonb
+      AND jsonb_build_array('runner:' || r.id::text || ':heartbeat',
+                           'runner:' || r.id::text || ':jobs') @> k.scopes
+  ) keys
+),
+registration_problems AS (
+  SELECT COALESCE(r.id, e.id)::text AS id,
+    CASE
+      WHEN r.id IS NULL THEN 'missing_source_registration'
+      WHEN e.id IS NULL THEN 'unrecorded_registration'
+      WHEN r.uncertain_key THEN 'uncertain_launcher_key'
+      ELSE 'changed_source_registration'
+    END AS reason
+  FROM observed_registrations r
+  FULL JOIN expected e USING (id)
+  WHERE r.id IS NULL OR e.id IS NULL OR r.uncertain_key
+     OR ROW(r.name, r.kind, NULLIF(r.hosted_group, ''), r.organization_id, r.agent_pool_id, r.runner_api_key_id)
+        IS DISTINCT FROM
+        ROW(e.name, e.kind, NULLIF(e.hosted_group, ''), e.organization_id, e.agent_pool_id, e.runner_api_key_id)
+),
+input_problems AS (
+  SELECT NULL::text AS id, 'wrong_database'::text AS reason
+  WHERE current_database() <> :'target_database'
+  UNION ALL
+  SELECT id::text, 'invalid_registration_input'
+  FROM expected
+  WHERE id IS NULL OR NULLIF(name, '') IS NULL OR kind IS NULL OR kind NOT IN ('hosted', 'customer')
+     OR (kind = 'hosted' AND (organization_id IS NOT NULL OR agent_pool_id IS NOT NULL))
+     OR (kind = 'customer' AND (organization_id IS NULL OR agent_pool_id IS NULL))
+  UNION ALL
+  SELECT id::text, 'duplicate_source_registration'
+  FROM expected GROUP BY id HAVING COUNT(*) > 1
+  UNION ALL
+  SELECT NULL::text, 'duplicate_source_launcher_name'
+  FROM expected
+  GROUP BY kind, name, organization_id, NULLIF(hosted_group, '')
+  HAVING COUNT(*) > 1
+),
+claims AS (
+  SELECT 'tofu'::text AS kind, id::text, runner_id, attempt,
+    claimed_phase::text AS phase,
+    CASE
+      WHEN status IN ('canceled', 'force_canceled') THEN 'canceled_awaiting_settlement'
+      WHEN status IN ('planning', 'running') OR dispatched_at IS NOT NULL THEN 'active'
+      ELSE 'reservation'
+    END AS disposition
+  FROM runs
+  WHERE status IN ('planning', 'running')
+     OR (status IN ('pending', 'pre_plan_completed', 'applying') AND (runner_id IS NOT NULL OR dispatched_at IS NOT NULL))
+     OR (status IN ('canceled', 'force_canceled') AND
+         (dispatched_at IS NOT NULL OR EXISTS (
+              SELECT 1 FROM state_locks lock WHERE lock.workspace_id = runs.workspace_id
+                AND (lock.lock_id = runs.id OR lock.locked_by = runs.id)
+         )))
+
+  UNION ALL
+  SELECT 'ansible', job.id::text, job.runner_id, job.attempt, '',
+    CASE
+      WHEN job.status = 'running' THEN 'active'
+      WHEN job.status = 'pending' AND job.started_at IS NULL THEN 'reservation'
+      WHEN job.status = 'pending' THEN 'pending_with_start'
+      WHEN execution.total <> 1 OR execution.bound <> 1 THEN 'unknown_canceled_execution'
+      ELSE 'canceled_awaiting_settlement'
+    END
+  FROM ansible_jobs job
+  LEFT JOIN LATERAL (
+    SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE same_claim) AS bound,
+      COUNT(*) FILTER (WHERE same_claim AND status IN ('completed', 'failed', 'canceled')
+                      AND finished_at IS NOT NULL) AS settled
+    FROM (
+      SELECT status, finished_at,
+        (runner_id = job.runner_id AND started_at = job.started_at) AS same_claim
+      FROM runner_job_executions
+      WHERE job_id = job.id AND job_type = 'ansible_job'
+    ) executions
+  ) execution ON job.status = 'canceled'
+  WHERE job.status = 'running'
+     OR (job.status = 'pending' AND (job.runner_id IS NOT NULL OR job.started_at IS NOT NULL))
+     OR (job.status = 'canceled' AND (job.started_at IS NOT NULL OR (job.runner_id IS NOT NULL AND job.attempt > 0))
+         AND (execution.total <> 1 OR execution.settled <> 1))
+
+  UNION ALL
+  SELECT 'work_item', id::text, runner_id, attempt, '',
+    CASE
+      WHEN status = 'running' THEN 'active'
+      WHEN status = 'canceled' THEN 'canceled_awaiting_settlement'
+      WHEN started_at IS NOT NULL THEN 'pending_with_start'
+      ELSE 'reservation'
+    END
+  FROM work_items
+  WHERE status = 'running'
+     OR (status = 'pending' AND (runner_id IS NOT NULL OR started_at IS NOT NULL))
+     OR (status = 'canceled' AND started_at IS NOT NULL AND finished_at IS NULL)
+),
+claim_problems AS (
+  SELECT id, CASE
+    WHEN runner_id IS NULL THEN 'claim_without_launcher'
+    WHEN disposition = 'pending_with_start' THEN 'pending_with_start'
+    WHEN disposition = 'unknown_canceled_execution' THEN 'unknown_canceled_execution'
+    ELSE 'unrecorded_claim_owner'
+  END AS reason
+  FROM claims c
+  WHERE disposition IN ('pending_with_start', 'unknown_canceled_execution')
+     OR NOT EXISTS (SELECT 1 FROM expected e WHERE e.id = c.runner_id)
+),
+problems AS (
+  SELECT id, reason FROM input_problems
+  UNION ALL SELECT id, reason FROM registration_problems
+  UNION ALL SELECT id, reason FROM claim_problems
+)
+SELECT jsonb_build_object(
+  'state', CASE
+     WHEN EXISTS (SELECT 1 FROM problems) THEN 'unavailable'
+     WHEN EXISTS (SELECT 1 FROM claims) THEN 'blocked'
+     ELSE 'clear'
+  END,
+  'claims', COALESCE((SELECT jsonb_agg(to_jsonb(c) ORDER BY c.kind, c.id) FROM claims c), '[]'::jsonb),
+  'problems', COALESCE((SELECT jsonb_agg(to_jsonb(p) ORDER BY p.reason, p.id) FROM problems p), '[]'::jsonb)
+);
+COMMIT;
+```
 
 ### Upgrading to the chart version with one launcher
 
