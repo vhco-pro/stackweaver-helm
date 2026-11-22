@@ -5,7 +5,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Have an idea for improving the Stackweaver Helm chart? We'd love to hear it.
+        Use synthetic values in your examples and remove deployment details.
 
   - type: textarea
     id: problem
@@ -19,7 +19,7 @@ body:
     id: solution
     attributes:
       label: Proposed solution
-      description: Describe what you'd like to see. Include example values, templates, or configuration if applicable.
+      description: Share only the few lines needed to show the problem. Replace cluster names, hostnames, endpoints, and credentials with placeholders.
     validations:
       required: true
 

@@ -5,7 +5,9 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for taking the time to report a bug. Please fill out the details below so we can investigate.
+        Share only information you can make public. Use synthetic values.
+        For a suspected vulnerability, follow the
+        [Stackweaver security policy](https://github.com/vhco-pro/stackweaver-frontend/security/policy).
 
   - type: input
     id: chart-version
@@ -20,7 +22,7 @@ body:
     id: kubernetes-version
     attributes:
       label: Kubernetes version
-      description: "Output of `kubectl version --short` or your cluster version."
+      description: "Enter only the Kubernetes server version."
       placeholder: e.g. 1.30.2
     validations:
       required: true
@@ -66,19 +68,19 @@ body:
     id: actual
     attributes:
       label: Actual behavior
-      description: What actually happened. Include error messages, logs, or `helm status` output if applicable.
+      description: Describe what happened. Include a short sanitized error excerpt if it helps.
     validations:
       required: true
 
   - type: textarea
     id: values
     attributes:
-      label: Values overrides
-      description: Relevant values you passed to the chart (redact any secrets).
+      label: Synthetic values excerpt
+      description: Share only the few lines needed to show the problem. Replace cluster names, hostnames, endpoints, and credentials with placeholders.
       render: yaml
 
   - type: textarea
     id: context
     attributes:
       label: Additional context
-      description: Any other context, screenshots, or log output.
+      description: Share any public links or synthetic details that help explain the problem.
